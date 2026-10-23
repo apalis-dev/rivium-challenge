@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -30,18 +31,22 @@ class NativeQueueTest {
         assertTrue(snapshot.getBoolean("paused"))
         assertTrue(snapshot.getInt("pending") > 0)
         RuntimeGateway.call(context, JSONObject().put("action", "pause").put("paused", false))
-        var result: JSONObject? = null
-        repeat(90) {
-            snapshot = RuntimeGateway.call(context, JSONObject().put("action", "snapshot"))
-            val jobs = snapshot.getJSONArray("jobs")
-            for (i in 0 until jobs.length()) {
-                val job = jobs.getJSONObject(i)
-                if (job.getString("id") == id && job.getString("status") == "ready") result = job
+        val photo = withTimeout(45_000) {
+            var completed: JSONObject? = null
+            while (completed == null) {
+                snapshot = RuntimeGateway.call(context, JSONObject().put("action", "snapshot"))
+                val jobs = snapshot.getJSONArray("jobs")
+                for (i in 0 until jobs.length()) {
+                    val job = jobs.getJSONObject(i)
+                    if (job.getString("id") == id && job.getString("status") == "ready") {
+                        completed = job
+                        break
+                    }
+                }
+                if (completed == null) delay(500)
             }
-            if (result == null) delay(500)
+            completed
         }
-        assertNotNull("Photo must finish through JNI + Rivium + Apalis", result)
-        val photo = result!!
         assertEquals(1600, photo.getInt("width"))
         assertEquals(800, photo.getInt("height"))
         assertTrue(File(photo.getString("output")).isFile)
