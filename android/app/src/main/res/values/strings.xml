@@ -1,0 +1,39 @@
+<resources>
+    <string name="app_name">Mchoro</string>
+
+    <!-- Gallery. Not from a design: copy written for this app. -->
+    <string name="gallery_title">Mchoro</string>
+    <string name="gallery_subtitle">Photos, hand-drawn in their own colours</string>
+    <string name="gallery_add_photos">Draw a photo</string>
+    <string name="gallery_empty_title">Nothing drawn yet</string>
+    <string name="gallery_empty_body">Pick a photo, or share one from any app, and Mchoro will sketch it.</string>
+    <string name="gallery_error_title">The sketch worker stopped</string>
+    <string name="gallery_retry">Try again</string>
+    <string name="gallery_sketching">Sketching…</string>
+    <string name="gallery_drawing_description">Drawing %1$s</string>
+    <string name="gallery_loading">Starting the sketch worker</string>
+
+    <!-- Studio -->
+    <string name="studio_back">Back</string>
+    <string name="studio_share">Share</string>
+    <string name="studio_delete">Delete</string>
+    <string name="studio_ink">Ink</string>
+    <string name="studio_style">Style</string>
+    <string name="studio_night_paper">Night paper</string>
+    <string name="studio_swatch_description">Ink colour %1$d of %2$d</string>
+    <string name="studio_sketch_description">Hand-drawn sketch of your photo</string>
+    <string name="studio_delete_title">Delete this drawing?</string>
+    <string name="studio_delete_body">The drawing and its colours will be removed from this phone.</string>
+    <string name="studio_delete_confirm">Delete</string>
+    <string name="studio_delete_cancel">Keep</string>
+    <string name="studio_share_chooser">Share drawing</string>
+    <string name="studio_share_failed">Couldn\'t prepare the drawing for sharing</string>
+    <string name="studio_not_found">This drawing is no longer here</string>
+
+    <!-- Scheme variants: short names so all five fit in one connected button group. -->
+    <string name="variant_tonal_spot">Soft</string>
+    <string name="variant_vibrant">Vivid</string>
+    <string name="variant_expressive">Playful</string>
+    <string name="variant_fidelity">True</string>
+    <string name="variant_monochrome">Pencil</string>
+</resources>
