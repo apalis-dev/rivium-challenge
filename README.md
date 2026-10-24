@@ -1,15 +1,11 @@
-
-
-
-
-https://github.com/user-attachments/assets/587a557b-67ce-4de3-965b-0a22ede15165
-
 # Pocketcrab 🦀: a pocket backend on Android
 
 Pinch a link, Ferris does the rest. Share a link from any Android app to **Pocketcrab**. An [Apalis](https://github.com/apalis-dev/apalis) job
 fetches the page and records its **title and SHA-256**, running inside a
 [Rivium](https://github.com/rivium-rs/rivium) service that lives *inside the app process*.
 Results show up as a **notification** and in the app's list.
+
+https://github.com/user-attachments/assets/587a557b-67ce-4de3-965b-0a22ede15165
 
 ```
  Share Sheet / clipboard button / Quick Settings tile
@@ -44,7 +40,7 @@ Results show up as a **notification** and in the app's list.
   results are still listed. The same holds on the laptop: stop the service, restart it, jobs are still there.
 * No `unsafe` in this crate; the JNI bridge comes from `rivium_jni::export!`.
 
-**Demo video** ([docs/pocketcrab-demo.mp4](https://github.com/horacenjoroge/rivium-challenge/blob/pocketcrab-link-digest/docs/pocketcrab-demo.mp4), 1:36): laptop `cargo run` session (rendered from the real captured terminal output, idle waits shortened), then the phone
+**Demo video** (1:36, also as a file: [docs/pocketcrab-demo.mp4](https://github.com/horacenjoroge/rivium-challenge/blob/pocketcrab-link-digest/docs/pocketcrab-demo.mp4), the player is at the top): laptop `cargo run` session (rendered from the real captured terminal output, idle waits shortened), then the phone
 (clipboard to notification) and the force-stop persistence test.
 
 ## Run on your laptop (no phone)
