@@ -1,3 +1,9 @@
+
+
+
+
+https://github.com/user-attachments/assets/587a557b-67ce-4de3-965b-0a22ede15165
+
 # Pocketcrab 🦀: a pocket backend on Android
 
 Pinch a link, Ferris does the rest. Share a link from any Android app to **Pocketcrab**. An [Apalis](https://github.com/apalis-dev/apalis) job
