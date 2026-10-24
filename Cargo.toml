@@ -1,0 +1,33 @@
+[package]
+name = "link-digest"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "GPL-3.0-only"
+default-run = "link-digest"
+description = "Share a link; an Apalis job inside a Rivium service digests it (title + hash)."
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+rivium = { version = "=0.2.0", features = ["rt"] }
+rivium-host = { version = "=0.2.0", features = ["process", "embedded"] }
+rivium-jni = "=0.2.0"
+apalis = "=1.0.0"
+apalis-sqlite = "=1.0.0"
+sqlx = { version = "0.9", default-features = false, features = ["sqlite", "runtime-tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+sha2 = "0.10"
+futures = "0.3"
+
+[[bin]]
+name = "link-digest"
+path = "src/bin/link-digest.rs"
+
+[[bin]]
+name = "enqueue"
+path = "src/bin/enqueue.rs"
