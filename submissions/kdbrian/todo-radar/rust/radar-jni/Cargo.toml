@@ -1,0 +1,13 @@
+[package]
+name = "radar-jni"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+radar-core = { path = "../radar-core" }
+rivium-jni.workspace = true

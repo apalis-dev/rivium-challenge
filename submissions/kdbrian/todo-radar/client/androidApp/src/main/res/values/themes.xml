@@ -1,0 +1,15 @@
+<resources>
+    <!-- Compose draws everything; the window theme only sets a light backdrop and transparent bars. -->
+    <style name="Theme.TodoRadar" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/radar_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="Theme.TodoRadar.Translucent" parent="Theme.TodoRadar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>

@@ -1,0 +1,19 @@
+# Rust
+/rust/target/
+# Android / Gradle
+.gradle/
+/client/**/build/
+/client/build/
+/client/local.properties
+/client/androidApp/src/main/jniLibs/
+.idea/
+*.iml
+.DS_Store
+# Local runtime data
+/rust/dev-root/
+/client/.kotlin/
+/client/desktopApp/resources/*/radar_jni*
+/client/desktopApp/resources/*/libradar_jni*
+
+# Local video generation output (never committed)
+brag-output*/

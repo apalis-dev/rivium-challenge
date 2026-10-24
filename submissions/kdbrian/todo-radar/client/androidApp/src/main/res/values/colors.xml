@@ -1,0 +1,5 @@
+<resources>
+    <color name="radar_background">#FFF6F8FB</color>
+    <color name="radar_glow">#FF1F8A4C</color>
+    <color name="radar_launcher_bg">#FFF4F4F1</color>
+</resources>
