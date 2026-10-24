@@ -1,0 +1,34 @@
+[workspace]
+resolver = "3"
+members = ["radar-core", "radar-jni"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.92"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+rivium = { version = "=0.2.0", features = ["rt"] }
+rivium-host = "=0.2.0"
+rivium-http = { version = "=0.2.0", features = ["server"] }
+rivium-jni = "=0.2.0"
+rivium-util = "=0.2.0"
+apalis = "=1.0.0"
+apalis-sqlite = "=1.0.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "runtime-tokio", "macros"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "stream", "json", "query", "form"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+webpki-roots = "1"
+futures-util = "0.3"
+zip = "9"
+regex = "1"
+sha2 = "0.11"
+tower = { version = "0.5", features = ["retry", "util"] }
+tracing = "0.1"
+
+[profile.release]
+# Smaller JNI libraries for the apps; symbols are not needed at runtime.
+strip = true

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="TODO Radar: every TODO, on your radar">
+  <title>TODO Radar</title>
+  <rect width="1280" height="420" rx="28" fill="#F4F4F1"/>
+  <g fill="none" stroke="#1C1C21" stroke-width="3" stroke-linecap="round">
+    <!-- left branch art -->
+    <path d="M110 0 V420"/>
+    <path d="M110 120 C110 160 200 140 200 190 V420"/>
+    <path d="M200 260 C200 300 290 280 290 330 V420"/>
+    <!-- right branch art -->
+    <path d="M1130 0 V420"/>
+    <path d="M1130 90 C1130 130 1040 115 1040 160 V300"/>
+    <path d="M1040 300 C1040 340 1130 330 1130 370"/>
+  </g>
+  <g stroke="#1C1C21" stroke-width="3">
+    <circle cx="110" cy="70" r="22" fill="#CFE8F8"/><path d="M110 56 L124 70 L110 84 L96 70 Z" fill="none"/>
+    <circle cx="110" cy="200" r="22" fill="#C6B3F7"/><circle cx="110" cy="200" r="9" fill="none"/>
+    <circle cx="200" cy="230" r="22" fill="#CFE8F8"/><rect x="190" y="220" width="20" height="20" fill="none"/>
+    <circle cx="110" cy="320" r="22" fill="#C6B3F7"/><circle cx="110" cy="320" r="9" fill="none"/>
+    <circle cx="290" cy="370" r="22" fill="#72D6A3"/><path d="M290 357 L302 379 L278 379 Z" fill="none"/>
+    <circle cx="1130" cy="50" r="22" fill="#FFD5B5"/><rect x="1120" y="40" width="20" height="20" fill="none"/>
+    <circle cx="1040" cy="200" r="22" fill="#72D6A3"/><path d="M1040 187 L1052 209 L1028 209 Z" fill="none"/>
+    <circle cx="1130" cy="230" r="22" fill="#CFE8F8"/><circle cx="1130" cy="230" r="9" fill="none"/>
+    <circle cx="1130" cy="370" r="22" fill="#C6B3F7"/><path d="M1130 356 L1144 370 L1130 384 L1116 370 Z" fill="none"/>
+  </g>
+  <!-- radar mark -->
+  <g transform="translate(640 112)">
+    <circle r="44" fill="#FFFFFF" stroke="#1C1C21" stroke-width="3"/>
+    <path d="M0 0 L44 0 A44 44 0 0 0 31 -31 Z" fill="#72D6A3" opacity="0.9"/>
+    <circle r="28" fill="none" stroke="#1C1C21" stroke-opacity="0.35" stroke-width="2"/>
+    <circle r="13" fill="none" stroke="#1C1C21" stroke-opacity="0.35" stroke-width="2"/>
+    <line x1="0" y1="0" x2="44" y2="0" stroke="#1C1C21" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="-18" cy="14" r="6" fill="#C6B3F7" stroke="#1C1C21" stroke-width="2"/>
+    <circle cx="12" cy="24" r="5" fill="#FFD5B5" stroke="#1C1C21" stroke-width="2"/>
+  </g>
+  <text x="640" y="232" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="78" fill="#1C1C21">TODO Radar<tspan fill="#1F8A4C">.</tspan></text>
+  <text x="640" y="282" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="30" fill="#1C1C21">Every TODO, on your radar.</text>
+  <text x="640" y="330" text-anchor="middle" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#6B6B76">A Rust job queue (Rivium + Apalis) living inside your phone and desktop</text>
+  <g font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="600" fill="#1C1C21">
+    <g transform="translate(432 372)">
+      <circle r="11" fill="#CFE8F8" stroke="#1C1C21" stroke-width="2.5"/><circle r="4.5" fill="none" stroke="#1C1C21" stroke-width="2"/>
+      <text x="20" y="6">TODO</text>
+    </g>
+    <g transform="translate(542 372)">
+      <circle r="11" fill="#C6B3F7" stroke="#1C1C21" stroke-width="2.5"/><path d="M0 -6 L6 0 L0 6 L-6 0 Z" fill="none" stroke="#1C1C21" stroke-width="2"/>
+      <text x="20" y="6">FIXME</text>
+    </g>
+    <g transform="translate(662 372)">
+      <circle r="11" fill="#72D6A3" stroke="#1C1C21" stroke-width="2.5"/><path d="M0 -6 L6 5 L-6 5 Z" fill="none" stroke="#1C1C21" stroke-width="2"/>
+      <text x="20" y="6">HACK</text>
+    </g>
+    <g transform="translate(772 372)">
+      <circle r="11" fill="#FFD5B5" stroke="#1C1C21" stroke-width="2.5"/><rect x="-5" y="-5" width="10" height="10" fill="none" stroke="#1C1C21" stroke-width="2"/>
+      <text x="20" y="6">XXX</text>
+    </g>
+  </g>
+</svg>
