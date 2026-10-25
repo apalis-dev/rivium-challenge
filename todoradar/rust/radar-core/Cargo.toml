@@ -1,0 +1,28 @@
+[package]
+name = "radar-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+rivium.workspace = true
+rivium-host = { workspace = true, features = ["process"] }
+rivium-http.workspace = true
+rivium-util.workspace = true
+apalis.workspace = true
+apalis-sqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+sqlx.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+webpki-roots.workspace = true
+futures-util.workspace = true
+axum = "0.8"
+zip.workspace = true
+regex.workspace = true
+sha2.workspace = true
+tower.workspace = true
+tracing.workspace = true
