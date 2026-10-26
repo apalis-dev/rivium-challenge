@@ -50,7 +50,7 @@ Requirements: Linux, Bash, JDK 17, Android SDK platform/build tools 35, NDK
 export ANDROID_HOME=/path/to/android-sdk
 # One-time SDK setup, using the SDK's sdkmanager:
 sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
-bash scripts/build-android.sh arm64-v8a x86_64
+bash build.sh arm64-v8a x86_64
 ```
 
 Install `android/app/build/outputs/apk/debug/app-debug.apk`. This is a signed
@@ -120,9 +120,10 @@ The instrumented Android test exercises the real JNI/Rivium/Apalis image worker
 and checks that pause state and jobs survive a runtime restart. A desktop JVM
 check alone does not establish Android device compatibility.
 
-`.github/workflows/build.yml` prepares Rust checks, Android lint, a downloadable
-debug APK (three-day retention), and an emulator instrumentation check when this
-source is placed in a GitHub repository. Local test results and the physical
+`build.sh` prepares native Android libraries, assembles the debug APK, and runs Android lint.
+Run `bash build.sh --check` for Rust formatting, Clippy, tests, desktop smoke and
+JVM/JNI validation. To run emulator instrumentation after building, use
+`cd android && ./gradlew connectedDebugAndroidTest`. Local test results and the physical
 phone checklist belong in `docs/PHONE_TEST.md`.
 
 ## Scope
