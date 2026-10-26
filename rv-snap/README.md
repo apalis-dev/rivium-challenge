@@ -8,10 +8,8 @@
 
 | 💻 1. Running on Laptop (`cargo run`) | 📱 2. Running on Mobile Phone (Android) |
 |:---:|:---:|
-| [![Laptop Runner Demo](docs/images/demo_laptop.gif)](docs/images/demo_laptop.mp4)<br><sub>*(Click to play MP4 or preview GIF)*</sub> | [![Mobile App Demo](docs/images/demo_mobile.gif)](docs/images/demo_mobile.mp4)<br><sub>*(Click to play MP4 or preview GIF)*</sub> |
+| [![Laptop Runner Demo](docs/images/demo_laptop.gif)](docs/images/demo_laptop.mp4)<br><sub>*(Click to play MP4 )*</sub> | [![Mobile App Demo](docs/images/demo_mobile.mp4)]<br><sub>*(Click to play MP4 )*</sub> |
 | **No phone needed:** Boots SQLite WAL persistence, runs Apalis workers under Rivium supervision, benchmarks 1,000 tasks in ~250ms, and creates ZIP. | **Real device execution:** Bulk Photo Picker, memory-safe worker threads, survival across app kill, and completion notifications. |
-
-> 📹 **Demo Media Files:** Place your recorded `demo_laptop.gif` (or `.mp4`) and `demo_mobile.gif` (or `.mp4`) directly into [`docs/images/`](docs/images/).
 
 ---
 
@@ -32,17 +30,15 @@
 
 ## 2. Screenshots & Visual Proof of Work
 
-> **Submission Showcase:** Add your device screenshots and screen recording GIF into the `docs/images/` directory using the filenames below (or update the markdown links).
 
 | 1. Photo Picker & Queue Metrics | 2. Supervised Batch Processing | 3. Completion Notification |
 |:---:|:---:|:---:|
 | ![Photo Picker & Queue](docs/images/01_home_queue.png) | ![Batch Processing](docs/images/02_batch_processing.png) | ![Completion Notification](docs/images/03_notification.png) |
 | *Bulk Photo Picker with live pending, processing & completed metrics* | *Rivium-supervised worker threads processing multi-format batch* | *Native high-priority notification fired when queue reaches 0* |
 
-| 4. Completed Works & Blake3 Gallery | 5. Apalis SQLite Persistence Observer | 6. Full End-to-End Demo (GIF / Video) |
+| 4. Completed Works & Blake3 Gallery | 5. Apalis SQLite Persistence Observer |  |
 |:---:|:---:|:---:|
-| ![Completed Works Gallery](docs/images/04_completed_gallery.png) | ![Apalis SQLite Observer](docs/images/05_apalis_observer.png) | ![Demo GIF / Video](docs/images/06_demo_walkthrough.gif) |
-| *Compression ratios (-65%), latency ms, Blake3 hashes & ZIP export* | *Real-time inspection of SQLite `Jobs` table states* | *Video / GIF showing background processing & app kill resilience* |
+| ![Completed Works Gallery](docs/images/04_completed_gallery.png) | ![Apalis SQLite Observer](docs/images/05_apalis_observer.png) 
 
 ---
 
@@ -176,7 +172,7 @@ cargo clippy --all-targets --all-features --locked -- -D warnings
 
 ## 7. Real Phone Verification Notes (Bonus)
 
-* **Device:** Android 14+ (ARM64)
+* **Device:** Android 14
 * **Tested Scenarios:**
   * **Normal Batch:** Imported 10 mixed JPEG and PNG images. Successfully compressed with space reductions between 45% and 80%.
   * **Large Files (>100MB):** Successfully imported high-resolution uncompressed images. Semaphore bounded concurrency and direct file stream decoding prevented LMK/OOM crashes.
