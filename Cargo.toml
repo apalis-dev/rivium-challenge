@@ -1,0 +1,35 @@
+[package]
+name = "pocket-backend"
+version = "0.1.0"
+edition = "2024"
+default-run = "pocket-cli"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "pocket-cli"
+path = "src/main.rs"
+
+[dependencies]
+rivium = "0.2.0"
+rivium-host = { version = "0.2.0", features = ["process", "embedded"] }
+rivium-jni = "0.2.0"
+apalis = "1.0.0"
+apalis-core = "1.0.0"
+apalis-sqlite = "1.0.0"
+sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "runtime-tokio"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+jni = "0.21"
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "charset", "http2", "gzip", "brotli"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+scraper = "0.29"
+url = "2"
+futures = "0.3"
+
+[profile.release]
+strip = true
