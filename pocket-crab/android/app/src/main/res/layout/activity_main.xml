@@ -15,7 +15,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Pocketcrab 🦀"
+        android:text="Pocketcrab &#x1F980;"
         android:textColor="@color/ink"
         android:textSize="30sp"
         android:textStyle="bold" />
@@ -34,7 +34,7 @@
         android:background="@drawable/card_bg"
         android:lineSpacingExtra="3dp"
         android:padding="14dp"
-        android:text="HOW TO USE&#10;1  Share a link from any app, pick Pocketcrab&#10;2  Or copy a link, tap the big button&#10;3  Or copy a link, tap the Pinch link tile&#10;Tap a card to open it. Tap a failed one to retry."
+        android:text="HOW TO USE&#10;1  Share a link from any app, pick Pocketcrab&#10;2  Choose Pinch once, or Watch it for changes&#10;3  Or copy a link and tap the big button&#10;Tap a card to open it. Long-press a watch to stop it."
         android:textColor="@color/ink"
         android:textSize="13sp" />
 
@@ -108,7 +108,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
         android:layout_marginBottom="8dp"
-        android:text="PINCHED LINKS"
+        android:text="YOUR LINKS"
         android:textColor="@color/muted"
         android:textSize="12sp"
         android:textStyle="bold" />
@@ -135,7 +135,7 @@
             android:background="@drawable/card_bg"
             android:lineSpacingExtra="4dp"
             android:padding="16dp"
-            android:text="Nothing pinched yet. Copy a link and tap the big button to try it."
+            android:text="Nothing here yet. Copy a link and tap the big button to try it."
             android:textColor="@color/ink"
             android:textSize="14sp" />
     </FrameLayout>

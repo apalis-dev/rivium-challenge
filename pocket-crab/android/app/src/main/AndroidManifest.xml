@@ -7,7 +7,10 @@
 
     <application
         android:label="Pocketcrab"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:allowBackup="false"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/App">
 
         <activity
@@ -25,6 +28,11 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- In-app browser: sign in to a site once; its session cookie is handed to the Rust worker -->
+        <activity
+            android:name=".LoginActivity"
+            android:exported="false" />
 
         <!-- Transparent trampoline: reads the clipboard (needs window focus) and queues the link -->
         <activity
@@ -44,6 +52,19 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+
+        <!-- Home screen widget: N watching / M changed -->
+        <receiver
+            android:name=".WatchWidget"
+            android:label="Pocketcrab watcher"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/watch_widget_info" />
+        </receiver>
 
         <service
             android:name=".WorkerService"

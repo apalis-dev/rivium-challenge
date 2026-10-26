@@ -1,4 +1,4 @@
-use crate::job::{digest, open, push, queue_config, write_snapshot};
+use crate::job::{digest, handle_command, open, queue_config, write_snapshot};
 use apalis::prelude::*;
 use apalis_sqlite::SqliteStorage;
 use rivium::{Kind, Result, Service, service};
@@ -35,8 +35,7 @@ impl App for LinkDigest {
                         let Ok(text) = std::fs::read_to_string(&path) else {
                             continue;
                         };
-                        let url = text.trim();
-                        if url.starts_with("http") && push(&pool, url).await.is_err() {
+                        if handle_command(&pool, &text).await.is_err() {
                             continue; // keep the file, retry next tick
                         }
                         let _ = std::fs::remove_file(&path);
