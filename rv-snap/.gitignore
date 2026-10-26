@@ -1,0 +1,8 @@
+target/
+snap_test_data/
+.gradle/
+build/
+*.so
+local.properties
+*.iml
+.idea/
