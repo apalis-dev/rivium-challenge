@@ -1,12 +1,15 @@
 package com.rivium.snap
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -33,6 +36,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
 
@@ -235,19 +239,30 @@ class MainActivity : ComponentActivity() {
                 return@launch
             }
 
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val zipFile = File(downloadsDir, "RiviumSnap_${System.currentTimeMillis()}.zip")
-            val success = CompletedWorksRepository.exportZip(itemsToExport, zipFile)
+            // Write zip to a private cache location first, then copy to Downloads via MediaStore
+            val zipName = "RiviumSnap_${System.currentTimeMillis()}.zip"
+            val tempZip = File(cacheDir, zipName)
+            val success = CompletedWorksRepository.exportZip(itemsToExport, tempZip)
+
+            if (!success) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Failed to create ZIP archive", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+
+            val savedName = saveFileToDownloads(tempZip)
+            tempZip.delete()
 
             withContext(Dispatchers.Main) {
-                if (success) {
+                if (savedName != null) {
                     Toast.makeText(
                         this@MainActivity,
-                        "Exported ${itemsToExport.size} images to Downloads/${zipFile.name}",
+                        "Exported ${itemsToExport.size} images to Downloads/$savedName",
                         Toast.LENGTH_LONG
                     ).show()
                 } else {
-                    Toast.makeText(this@MainActivity, "Failed to create ZIP archive", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Failed to save ZIP to Downloads", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -264,23 +279,78 @@ class MainActivity : ComponentActivity() {
                 return@launch
             }
 
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val destFile = File(downloadsDir, file.name)
-            try {
-                file.copyTo(destFile, overwrite = true)
-                withContext(Dispatchers.Main) {
+            val savedName = saveFileToDownloads(file)
+            withContext(Dispatchers.Main) {
+                if (savedName != null) {
                     Toast.makeText(
                         this@MainActivity,
-                        "Saved to Downloads/${destFile.name}",
+                        "Saved to Downloads/$savedName",
                         Toast.LENGTH_SHORT
                     ).show()
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "Failed to save: ${e.message}", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "Failed to save to Downloads", Toast.LENGTH_SHORT).show()
                 }
             }
         }
+    }
+
+    /**
+     * Saves a file to the public Downloads folder.
+     * On Android 10+ (API 29+) uses MediaStore so the file is properly indexed and visible.
+     * On Android 9 and below uses a direct file copy with MediaScanner notification.
+     * Returns the saved file name on success, or null on failure.
+     */
+    private fun saveFileToDownloads(file: File): String? {
+        return try {
+            val mimeType = guessMimeType(file.extension)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, file.name)
+                    put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val resolver = contentResolver
+                val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                val itemUri = resolver.insert(collection, values)
+                    ?: return null
+                resolver.openOutputStream(itemUri)?.use { out ->
+                    FileInputStream(file).use { it.copyTo(out) }
+                }
+                values.clear()
+                values.put(MediaStore.Downloads.IS_PENDING, 0)
+                resolver.update(itemUri, values, null, null)
+                file.name
+            } else {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                downloadsDir.mkdirs()
+                val destFile = File(downloadsDir, file.name)
+                file.copyTo(destFile, overwrite = true)
+                // Notify the media scanner so the file appears in file managers immediately
+                MediaScannerConnection.scanFile(
+                    this@MainActivity,
+                    arrayOf(destFile.absolutePath),
+                    arrayOf(mimeType),
+                    null
+                )
+                destFile.name
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to save to Downloads: ${e.message}", e)
+            null
+        }
+    }
+
+    private fun guessMimeType(extension: String): String = when (extension.lowercase()) {
+        "jpg", "jpeg" -> "image/jpeg"
+        "png" -> "image/png"
+        "webp" -> "image/webp"
+        "gif" -> "image/gif"
+        "bmp" -> "image/bmp"
+        "heic", "heif" -> "image/heic"
+        "tiff", "tif" -> "image/tiff"
+        "zip" -> "application/zip"
+        else -> "application/octet-stream"
     }
 
     private fun resolveUri(context: Context, uri: Uri, targetDir: File): String {
