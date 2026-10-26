@@ -51,11 +51,11 @@ https://github.com/user-attachments/assets/587a557b-67ce-4de3-965b-0a22ede15165
   `state.json` (the UI only learns *which hosts* have a login). A new login replaces the old one and applies to
   watches that are already running. Plain `http` is refused by the app except for `127.0.0.1`/`localhost`, which
   is only there for local testing.
-* **What was verified on the phone** (Redmi 12): the share dialog, watching, change detection and notifications,
-  persistence across force-stop and reinstall, and login against a local test site that needs a session cookie
-  (see the videos). Not yet verified by hand: the home screen widget on the home screen, the Quick Settings
-  tile, and the notification's *Stop watching* button. The Share Sheet was exercised by delivering the same
-  `ACTION_SEND` intent over adb rather than through the system share menu.
+* **What was verified on the phone** (Redmi 12): the share dialog, watching, change detection and notifications
+  (including the *Stop watching* button), the home screen widget, the Quick Settings tile, persistence across
+  force-stop and reinstall, and login against a local test site that needs a session cookie (see the videos).
+  The one exception: the Share Sheet was exercised by delivering the same `ACTION_SEND` intent over adb rather
+  than through the system share menu.
 * **Persistence:** jobs, results, watches and logins live in SQLite (`apalis-sqlite`). Force-stop the app,
   reopen it, and unfinished jobs are re-queued (picked up again within ~5-10 s, because of the 5 s heartbeat)
   and watches carry on. The same holds on the laptop: stop the service, restart it, everything is still there.
