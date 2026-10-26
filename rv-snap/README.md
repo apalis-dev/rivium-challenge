@@ -8,7 +8,7 @@
 
 | 💻 1. Running on Laptop (`cargo run`) | 📱 2. Running on Mobile Phone (Android) |
 |:---:|:---:|
-<<<<<<< HEAD
+
 | ![Laptop Demo](docs/images/demo-pc.png) | [![▶ Watch Mobile Demo](https://img.shields.io/badge/▶%20Play%20Demo-MP4%20Video-informational?style=for-the-badge&logo=android)](docs/images/demo_mobile.mp4) |
 =======
 | [![▶ Watch Laptop Demo](https://img.shields.io/badge/▶%20Watch%20Demo-Google%20Drive-blue?style=for-the-badge&logo=googledrive)]([https://drive.google.com/file/d/1P0LBdXk63xHHm3zJta3WQ03ma2NsAT45/view?usp=sharing](https://drive.google.com/file/d/1nVTTmiG5RDfqC1ScvptRNlkM-63sfC3O/view?usp=sharing)) | <video src="docs/images/demo_mobile.mp4" controls width="320">📱 <a href="docs/images/demo_mobile.mp4">Watch Mobile Demo</a></video> |
