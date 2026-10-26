@@ -8,7 +8,7 @@
 
 | 💻 1. Running on Laptop (`cargo run`) | 📱 2. Running on Mobile Phone (Android) |
 |:---:|:---:|
-| [![Laptop Runner Demo](docs/images/demo_laptop.gif)](docs/images/demo_laptop.mp4)<br><sub>*(Click to play MP4 )*</sub> | [![Mobile App Demo](docs/images/demo_mobile.mp4)]<br><sub>*(Click to play MP4 )*</sub> |
+| [![▶ Watch Laptop Demo](https://img.shields.io/badge/▶%20Watch%20Demo-Google%20Drive-blue?style=for-the-badge&logo=googledrive)](https://drive.google.com/file/d/1P0LBdXk63xHHm3zJta3WQ03ma2NsAT45/view?usp=sharing) | <video src="docs/images/demo_mobile.mp4" controls width="320">📱 <a href="docs/images/demo_mobile.mp4">Watch Mobile Demo</a></video> |
 | **No phone needed:** Boots SQLite WAL persistence, runs Apalis workers under Rivium supervision, benchmarks 1,000 tasks in ~250ms, and creates ZIP. | **Real device execution:** Bulk Photo Picker, memory-safe worker threads, survival across app kill, and completion notifications. |
 
 ---
