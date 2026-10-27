@@ -1,0 +1,6 @@
+rust/target/
+android/app/src/main/jniLibs/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
