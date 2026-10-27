@@ -1,0 +1,5 @@
+[service] apalis worker running; db at /Users/mac/TackPing/rust/target/long/taskping.db
+[worker] Table 10: 10 x 1 = 10
+[worker] Add 2 + 3 = 5
+[worker] Table 10: 10 x 2 = 20
+[worker] Table 10: 10 x 3 = 30

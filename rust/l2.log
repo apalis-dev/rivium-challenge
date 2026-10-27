@@ -1,0 +1,10 @@
+[service] apalis worker running; db at /Users/mac/TackPing/rust/target/long/taskping.db
+[worker] Table 10: resuming after step 3/10
+[worker] Table 10: 10 x 4 = 40
+[worker] Table 10: 10 x 5 = 50
+[worker] Table 10: 10 x 6 = 60
+[worker] Table 10: 10 x 7 = 70
+[worker] Table 10: 10 x 8 = 80
+[worker] Table 10: 10 x 9 = 90
+[worker] Table 10: 10 x 10 = 100
+[service] apalis worker stopped
