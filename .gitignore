@@ -33,4 +33,4 @@ rustc-ice-*.txt
 # Local durable queue and worker results
 /linkqueue-data/
 rivium_linkqueue_agent_brief_updated.md
-IMPLEMENTATION_PLAN.mdp
+IMPLEMENTATION_PLAN.md

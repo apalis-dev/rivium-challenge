@@ -1,77 +1,68 @@
-# rivium-challenge
-rivium + apalis pocket backend challenge
+# LinkQueue
 
-Run a small background job queue **inside an Android app**, and trigger it with one cool Android feature.
+LinkQueue is an Android link inbox backed by Rust, Apalis, and Rivium. Users can share a URL into the app or enter one manually. The app saves accepted links with Room and submits each link to a durable Apalis SQLite queue. A Rivium-managed Rust worker normalizes HTTP(S) URLs, calculates a SHA-256 hash, and writes a result associated with the job ID. The app reads that result and shows the job status.
 
-**Time:** 1 week | **Level:** new to Rust is fine
+## Requirements covered
 
-## The idea
+- Android Share Sheet intake and manual URL entry.
+- URL validation, normalization, and SHA-256 processing in Rust.
+- Durable Apalis SQLite jobs processed by an Apalis worker managed by Rivium.
+- JNI integration that starts the embedded worker, enqueues a URL, and reads its result.
+- Room persistence for the Android saved-link list, kept separate from queue and worker-result storage.
+- A standalone laptop worker and enqueue command for demonstrating the Rust side without the Android UI.
 
-- **[Rivium](https://github.com/rivium-rs/rivium)** starts and stops your Rust code cleanly, on a laptop or inside an Android app.
-- **[Apalis](https://github.com/apalis-dev/apalis)** runs background jobs (think "do this task later, retry if it fails").
-- **An Android feature** is how jobs get started or how results show up on the phone.
+## Architecture and data
 
-Your goal: connect all three so that something useful happens on a real phone or emulator.
+On Android, the native library starts the Rivium embedded host and uses the app-private files directory for the Apalis SQLite database and job result files. Room stores links and their displayed state. The job ID ties a Room entry to its Rust queue result. Queue entries and results survive app process restarts because they are stored in app-private persistent storage.
 
-## What to build
+On a laptop, the standalone Rivium process host and enqueue command use the same local data directory. Android and laptop use separate local databases; they do not share jobs over a network.
 
-A tiny Android app where:
+## Run the Rust worker on Windows
 
-1. Something on the phone creates a job (a button, a tile, a shared link, a photo, anything).
-2. A Rust worker, running under Rivium, does the job.
-3. The result shows up on the phone (notification, widget, screen, etc.).
+Install Rust (the project uses edition 2024) and open PowerShell at the repository root. Start the worker:
 
-## Must haves
+```powershell
+cargo run -- --root target/linkqueue --set data_dir=target/linkqueue
+```
 
-- [ ] Rust code uses both Rivium and Apalis
-- [ ] **One** job type is enough
-- [ ] Runs on your laptop first with `cargo run` (no phone needed)
-- [ ] Runs inside the Android app
-- [ ] Jobs are saved, so they are still there after you close and reopen the app
-- [ ] **One** Android feature from the list below
-- [ ] A short README: what it does, how to run it, which versions you used
+In a second PowerShell window, submit a URL to that same directory:
 
-## Some Android feature examples
+```powershell
+cargo run -- enqueue https://example.com target/linkqueue
+```
 
-| Feature | Example |
-|---|---|
-| Quick Settings tile | Tap the tile to start a job |
-| Notification | Show job progress or results |
-| Home screen widget | Show how many jobs are waiting |
-| Share Sheet | Share a link to your app and it gets processed |
-| Camera / Photo Picker | Each photo becomes a job (resize, hash, etc.) |
-| Your own idea | Tell us in an issue first |
+The enqueue command prints the job ID. The worker processes the durable queue and writes each result under `target/linkqueue/results/`. Both commands must use the same data directory. If the worker is stopped while jobs are pending, start it again with the same directory to resume processing.
 
-## Suggested steps
+The data directory can also be selected with `LINKQUEUE_DATA_DIR` when using the default path. Do not use a different directory for the worker and enqueue command if they are meant to share a queue.
 
-1. Run Rivium's basic example:
-   ```bash
-   cargo run -p rivium-examples --example basic-service -- --root target/basic-example
-   ```
-2. Get an Apalis job running in a plain Rust program (no Android yet).
-3. Put that worker inside a Rivium service.
-4. Follow Rivium's JNI example to load it in Android.
-5. Add your Android feature last.
+## Build and run Android on Windows
 
-Rivium needs Rust 1.92 or newer. Both libraries are still changing, so **pin the versions** you use and follow their current docs and examples.
+Open the `android/` directory in Android Studio, or use PowerShell from that directory. Install the Android SDK platform and NDK configured in Android Studio. Install `cargo-ndk` and both Rust Android targets:
 
-## Scoring (100 points)
+```powershell
+cargo install cargo-ndk --locked
+rustup target add aarch64-linux-android x86_64-linux-android
+```
 
-| What | Points |
-|---|---:|
-| It works end to end | 40 |
-| The Android feature is creative and actually used | 30 |
-| Jobs survive closing the app | 15 |
-| README is clear | 15 |
+The Gradle `buildRustAndroid` task uses the configured SDK/NDK and packages Rust libraries for `arm64-v8a` phones and `x86_64` emulators as part of the normal app build.
 
-**Bonus (+10):** test on a real phone and write down what happened. Rivium's own Android checks only confirm it compiles, so this is useful to the maintainers.
+```powershell
+cd android
+.\gradlew.bat assembleDebug
+```
 
-## Submit
+Install `app\build\outputs\apk\debug\app-debug.apk` on a supported device or emulator. Share a URL from another app or enter one in LinkQueue. The app displays its saved link and processing result. Android Studio can also open `android/` directly and run the `app` configuration.
 
-A PR with your code, the README, and a short video or GIF of it working.
+## Versions
 
-## Tips
+Rust dependency versions are locked in `Cargo.lock`. The core integration uses Apalis 1.0.0, Apalis SQLite 1.0.0, Rivium 0.2.0, and Rivium JNI 0.2.0. The Android version catalog is in `android/gradle/libs.versions.toml`; it currently configures Android Gradle Plugin 9.4.1, Gradle 9.6.0, Kotlin 2.2.10, Room 2.8.4, and Android API 37.
 
-- Stuck on Rust errors? Make it work on your laptop first, then move to Android.
-- Keep it small. A simple idea that works beats a big one that doesn't.
-- Questions about Rivium? Open an issue with the version, platform and a small example.
+## Verification
+
+The following have been verified for this project:
+
+- `cargo test` and `cargo build` pass on Windows.
+- The laptop enqueue/worker flow processes a URL and persists its result.
+- The Android `assembleDebug` task completes with the Rust Android build enabled. The APK packages the native Rust library for the configured Android ABIs.
+
+For a functional check, submit a valid HTTP(S) URL and confirm the normalized URL and hash appear. Also check malformed or unsupported URLs, duplicate submission, Share Sheet intake, and saved links after app restart. Device/emulator runtime testing is separate from a successful build; use a device ABI matching one of the packaged libraries. The challenge submission also asks for a short video or GIF showing the app working; capture it from the final device demonstration.
