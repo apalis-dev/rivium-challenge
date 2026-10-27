@@ -3,6 +3,7 @@
 
     <!-- Loopback only: the app talks to its own Rust listener. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="Pocket"
@@ -12,10 +13,18 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="Pocket">
+            android:label="Pocket"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Sharing text from any app becomes a job. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
     </application>
