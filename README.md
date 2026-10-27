@@ -8,6 +8,8 @@ back through a notification.
 The same `App` runs on a laptop with `cargo run` and inside the phone. Nothing in the
 queue code knows which host it is under.
 
+The original challenge brief is preserved as [CHALLENGE.md](CHALLENGE.md).
+
 ## What it does
 
 Share a snippet from Chrome, a note, anywhere:
