@@ -17,6 +17,7 @@ path = "src/main.rs"
 [dependencies]
 rivium = { version = "=0.2.0", features = ["rt"] }
 rivium-host = { version = "=0.2.0", features = ["embedded", "process"] }
+rivium-jni = "=0.2.0"
 rivium-http = { version = "=0.2.0", features = ["server"] }
 axum = { version = "0.8", default-features = false, features = ["json"] }
 apalis = "=1.0.0"
