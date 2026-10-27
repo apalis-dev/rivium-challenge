@@ -1,77 +1,142 @@
-# rivium-challenge
-rivium + apalis pocket backend challenge
+# TaskPing
 
-Run a small background job queue **inside an Android app**, and trigger it with one cool Android feature.
+TaskPing is an Android demo that submits jobs from Kotlin to a Rust worker. The Rust worker uses Rivium to manage its lifecycle and Apalis with SQLite to store and process jobs.
 
-**Time:** 1 week | **Level:** new to Rust is fine
+This repository contains both the Android application and the Rust library/binaries used by the application.
 
-## The idea
+## What the application does
 
-- **[Rivium](https://github.com/rivium-rs/rivium)** starts and stops your Rust code cleanly, on a laptop or inside an Android app.
-- **[Apalis](https://github.com/apalis-dev/apalis)** runs background jobs (think "do this task later, retry if it fails").
-- **An Android feature** is how jobs get started or how results show up on the phone.
+The app has two job flows:
 
-Your goal: connect all three so that something useful happens on a real phone or emulator.
+- **Quick task:** submits `DemoJob::Add { a, b }` and waits for the Rust worker to return `a + b`.
+- **Long task:** submits `DemoJob::Table { base, upto }`. The worker processes one step per second, records progress in SQLite, and returns the sum of `base x 1` through `base x upto`.
 
-## What to build
+The Android UI starts the Rust host with the app's private files directory as its root. The SQLite database is stored at:
 
-A tiny Android app where:
+```text
+<app files directory>/taskping.db
+```
 
-1. Something on the phone creates a job (a button, a tile, a shared link, a photo, anything).
-2. A Rust worker, running under Rivium, does the job.
-3. The result shows up on the phone (notification, widget, screen, etc.).
+Long-job IDs are also saved in Android `SharedPreferences` so the UI can recover and poll jobs after an app restart. While unfinished long jobs exist, `TaskPingService` runs as a foreground service and keeps the process available for the Rust worker. Android may still stop or restrict services; this is not a guarantee of execution under every operating-system condition.
 
-## Must haves
+## Repository layout
 
-- [ ] Rust code uses both Rivium and Apalis
-- [ ] **One** job type is enough
-- [ ] Runs on your laptop first with `cargo run` (no phone needed)
-- [ ] Runs inside the Android app
-- [ ] Jobs are saved, so they are still there after you close and reopen the app
-- [ ] **One** Android feature from the list below
-- [ ] A short README: what it does, how to run it, which versions you used
+```text
+android/                         Android application
+android/app/src/main/...         Kotlin UI, JNI declarations, service, notifications
+rust/src/lib.rs                  Job types, SQLite storage, worker, and Rivium app
+rust/src/jni_bridge.rs           JNI entry points used by Kotlin
+rust/src/main.rs                 Laptop Rivium host
+rust/src/bin/submit.rs           Laptop command-line client
+build-android.sh                 Builds native libraries and the debug APK
+```
 
-## Some Android feature examples
+## Rust implementation
 
-| Feature | Example |
-|---|---|
-| Quick Settings tile | Tap the tile to start a job |
-| Notification | Show job progress or results |
-| Home screen widget | Show how many jobs are waiting |
-| Share Sheet | Share a link to your app and it gets processed |
-| Camera / Photo Picker | Each photo becomes a job (resize, hash, etc.) |
-| Your own idea | Tell us in an issue first |
+`rust/src/lib.rs` defines two job variants:
 
-## Suggested steps
+```text
+Add   { a, b }       -> a + b
+Table { base, upto } -> base * upto * (upto + 1) / 2
+```
 
-1. Run Rivium's basic example:
-   ```bash
-   cargo run -p rivium-examples --example basic-service -- --root target/basic-example
-   ```
-2. Get an Apalis job running in a plain Rust program (no Android yet).
-3. Put that worker inside a Rivium service.
-4. Follow Rivium's JNI example to load it in Android.
-5. Add your Android feature last.
+`Table` progress is stored in the `taskping_progress` SQLite table. The Apalis result is stored by `apalis-sqlite`. The worker is owned by the Rivium service named `apalis-worker` and stops when Rivium stops that service.
 
-Rivium needs Rust 1.92 or newer. Both libraries are still changing, so **pin the versions** you use and follow their current docs and examples.
+The JNI bridge exposes these Android methods:
 
-## Scoring (100 points)
+- `nativeStart`, `nativeStop`, `nativeStatus`, `nativeLastError`, and `nativeVersion` for the Rivium lifecycle.
+- `nativeRunDemoJob` to submit and wait for an `Add` job.
+- `nativeSubmitTable` to submit a `Table` job and return its ID.
+- `nativeCheck` to read `pending`, `running:step/total`, `done:value`, or `failed:error`.
 
-| What | Points |
-|---|---:|
-| It works end to end | 40 |
-| The Android feature is creative and actually used | 30 |
-| Jobs survive closing the app | 15 |
-| README is clear | 15 |
+## Rust prerequisites
 
-**Bonus (+10):** test on a real phone and write down what happened. Rivium's own Android checks only confirm it compiles, so this is useful to the maintainers.
+- Rust toolchain meeting `rust-version = "1.92"` in `rust/Cargo.toml`.
+- A working C/C++ linker for the host platform. On Windows, the MSVC toolchain requires Visual Studio or Visual Studio Build Tools with the **Desktop development with C++** workload, including `link.exe`.
+- Network access the first time Cargo downloads crates, unless all dependencies are already cached.
 
-## Submit
+Run the Rust commands from `rust/`:
 
-A PR with your code, the README, and a short video or GIF of it working.
+```powershell
+cargo fmt --all -- --check
+cargo test
+```
 
-## Tips
+There are currently no Rust test functions in the source tree, so `cargo test` primarily verifies that the crate and its test targets compile successfully.
 
-- Stuck on Rust errors? Make it work on your laptop first, then move to Android.
-- Keep it small. A simple idea that works beats a big one that doesn't.
-- Questions about Rivium? Open an issue with the version, platform and a small example.
+Run the laptop worker and client in separate terminals:
+
+```powershell
+# Terminal 1
+cargo run -- run --root target/demo
+
+# Terminal 2: submit an Add job and wait for its result
+cargo run --bin submit -- target/demo add 2 3
+
+# Submit a long job; the command prints its job ID
+cargo run --bin submit -- target/demo table 10 30
+
+# Check a long job by ID
+cargo run --bin submit -- target/demo check JOB_ID
+```
+
+The database is created under the root passed with `--root`. Stop the worker with Ctrl-C. A job that remains in the SQLite queue can be picked up when the worker starts again.
+
+## Android prerequisites
+
+- Android SDK with the compile SDK used by the project (`compileSdk = 37`).
+- Android NDK 30.0.16248370, or an installed NDK version configured consistently with the build.
+- Java/Gradle support for the Android project. The project uses Gradle 9.1.0, Android Gradle Plugin 9.0.1, Kotlin 2.3.20, and Java 17 source/target compatibility.
+- `cargo-ndk` and the Android Rust targets when rebuilding the native libraries.
+- An Android device or emulator for installation and runtime testing.
+
+Install the Rust Android targets and `cargo-ndk` according to your platform, then configure `ANDROID_NDK_HOME`. The default path in `build-android.sh` is written for a macOS Android SDK location; on Windows or Linux, set `ANDROID_NDK_HOME` explicitly before running the script.
+
+Build the native libraries and debug APK:
+
+```sh
+./build-android.sh
+```
+
+On Windows, the Gradle portion can be run directly from PowerShell:
+
+```powershell
+cd android
+.\\gradlew.bat assembleDebug
+```
+
+The APK is produced at:
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Install and launch it with an attached device or running emulator:
+
+```sh
+adb install -r -g android/app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.taskping.app/.MainActivity
+```
+
+On Android 13 and later, the app requests notification permission. The quick-task completion notification and long-task completion notification are not shown if that permission is denied, but the UI can still display job results.
+
+## Verification status
+
+The following checks were run while preparing this README:
+
+- Android `assembleDebug`: **passed** using the existing native libraries in `android/app/src/main/jniLibs`.
+- Rust `cargo test`: **not completed** in the Windows environment because the MSVC linker `link.exe` was unavailable.
+- Rust `cargo fmt --all -- --check`: **failed** because the current Rust sources are not formatted according to rustfmt.
+- Android device/emulator behavior: **not verified in this environment**. A successful APK build does not prove that JNI loading, job processing, notifications, or service recovery work on a device.
+
+The Android build also reports a compatibility warning because compile SDK 37 is newer than the SDK range tested by Android Gradle Plugin 9.0.1. It is currently a warning, not a build failure.
+
+## Current limitations
+
+- No automated Rust or Android application tests are checked into the repository.
+- A long job runs one step per second and is limited to 5-300 steps by the Android slider; the command-line client does not apply that UI range.
+- `nativeRunDemoJob` waits synchronously for its result, so Kotlin calls it on `Dispatchers.IO`, not the main thread.
+- The foreground service is used only while long jobs are unfinished. Android lifecycle and background-execution policies can still affect it.
+- Notification permission denial is handled by suppressing completion notifications.
+- Job failures are displayed as failure state, but the app does not provide a separate retry UI.
+- The generated native libraries under `android/app/src/main/jniLibs` are ignored by Git and must be rebuilt when they are absent or stale.
