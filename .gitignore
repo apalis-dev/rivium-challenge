@@ -4,3 +4,5 @@ android/app/src/main/jniLibs/
 *.db-wal
 *.db-shm
 .DS_Store
+.idea/
+*.log
