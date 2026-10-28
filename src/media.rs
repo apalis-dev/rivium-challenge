@@ -68,8 +68,8 @@ fn client() -> Result<reqwest::Client, MediaError> {
         .map_err(|e| MediaError::Transient(format!("cannot set up the http client: {e}")))
 }
 
-/// Ask X for the post and pick the best mp4.
-pub async fn resolve(link: &str) -> Result<Resolved, MediaError> {
+/// Fetch the post document itself.
+async fn post(link: &str) -> Result<(String, Value), MediaError> {
     let id = post_id(link)
         .ok_or_else(|| MediaError::Permanent(format!("not an X post link: {link}")))?;
     let url = SYNDICATION.replace("{id}", &id);
@@ -92,6 +92,12 @@ pub async fn resolve(link: &str) -> Result<Resolved, MediaError> {
             "post {id} is not publicly available (deleted, protected or limited)"
         )));
     }
+    Ok((id, body))
+}
+
+/// Ask X for the post and pick the best mp4.
+pub async fn resolve(link: &str) -> Result<Resolved, MediaError> {
+    let (id, body) = post(link).await?;
 
     let author = body
         .pointer("/user/screen_name")
@@ -220,5 +226,58 @@ pub async fn save_video(link: &str, into: &Path) -> Result<Value, MediaError> {
         "height": resolved.height,
         "bitrate": resolved.bitrate,
         "author": resolved.author,
+    }))
+}
+
+/// Collect what the card needs and keep the images on disk, so the UI can draw
+/// without touching the network.
+pub async fn save_card(link: &str, into: &Path) -> Result<Value, MediaError> {
+    let (id, post) = self::post(link).await?;
+    tokio::fs::create_dir_all(into)
+        .await
+        .map_err(|e| MediaError::Transient(format!("cannot create the download folder: {e}")))?;
+
+    let text = post.get("text").and_then(Value::as_str).unwrap_or_default().to_owned();
+    let name = post.pointer("/user/name").and_then(Value::as_str).unwrap_or("unknown").to_owned();
+    let handle = post
+        .pointer("/user/screen_name")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown")
+        .to_owned();
+    let when = post
+        .get("created_at")
+        .and_then(Value::as_str)
+        .map(|stamp| stamp.chars().take(10).collect::<String>())
+        .unwrap_or_default();
+
+    let mut avatar = None;
+    if let Some(url) = post.pointer("/user/profile_image_url_https").and_then(Value::as_str) {
+        let url = url.replace("_normal.", "_200x200.");
+        let path = into.join(format!("{id}_avatar.jpg"));
+        if download(&url, &path).await.is_ok() {
+            avatar = Some(path.to_string_lossy().to_string());
+        }
+    }
+
+    let mut thumb = None;
+    if let Some(url) = post
+        .pointer("/mediaDetails/0/media_url_https")
+        .and_then(Value::as_str)
+    {
+        let path = into.join(format!("{id}_thumb.jpg"));
+        if download(url, &path).await.is_ok() {
+            thumb = Some(path.to_string_lossy().to_string());
+        }
+    }
+
+    Ok(serde_json::json!({
+        "kind": "card",
+        "author": handle,
+        "name": name,
+        "date": when,
+        "text": text,
+        "avatar": avatar,
+        "thumb": thumb,
+        "source": format!("x.com/{handle}/status/{id}"),
     }))
 }

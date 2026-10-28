@@ -169,6 +169,32 @@ adb forward tcp:8787 tcp:8787  # optional: poke the phone's queue from the lapto
 curl -s localhost:8787/readyz
 ```
 
+## Saving media from a link
+
+On this branch a shared post link is more than text: the app asks what to do with it.
+
+| Choice | What the worker does |
+| --- | --- |
+| **Download the video** | Resolves the post, takes the highest-bitrate stream, streams it to app storage, then publishes it to `Downloads/Pocket` |
+| **Save a card image** | Fetches the post's public metadata and its images, then the app draws a card (1080x1350) and publishes it to `Downloads/Pocket` |
+| **Just describe the text** | The original word/character job |
+
+Transfers resume: bytes go to a `.part` file and a retry continues with a `Range`
+request, so a dropped connection costs what was missed rather than the whole file.
+Verified by killing the app mid-transfer — 3.5 MB on disk, relaunched, finished at
+exactly 11,493,459 bytes on attempt 2.
+
+Three deliberate limits:
+
+- **No foreground service.** The system may kill a transfer (it did, via SIGKILL). That
+  used to lose the file; now it costs a restart of the transfer, and the job is re-queued
+  automatically. A persistent notification and an Android 14 service type buy nothing a
+  resume does not already give, so the process is allowed to die.
+- **MP3 is desktop only.** The phone has no ffmpeg, and bundling one per ABI is ~20 MB for
+  a feature the desktop CLI already does. `x-archive --audio` covers it.
+- **Public posts only.** Protected, deleted or limited posts return a tombstone and are
+  reported as unavailable; nothing is worked around.
+
 ## What survives what
 
 | Situation | Result |

@@ -88,11 +88,16 @@ class MainActivity : Activity() {
     private fun reconcilePublished() {
         io.execute {
             PocketClient.list()
-                .filter { it.status == "done" && it.savedFile != null }
+                .filter { it.status == "done" }
                 .forEach { job ->
-                    val name = File(job.savedFile!!).name
+                    val isCard = job.raw?.optString("kind") == "card"
+                    val name = when {
+                        isCard -> cardName(job.raw!!, job.id)
+                        job.savedFile != null -> File(job.savedFile).name
+                        else -> return@forEach
+                    }
                     if (!alreadyPublished(name)) {
-                        publishToDownloads(job.savedFile)?.let { published ->
+                        publishFinished(job)?.let { published ->
                             Notifier.done(applicationContext, job, published)
                         }
                     }
@@ -172,8 +177,12 @@ class MainActivity : Activity() {
         }
         AlertDialog.Builder(this)
             .setTitle("Save this post")
-            .setItems(arrayOf("Download the video", "Just describe the text")) { _, which ->
-                if (which == 0) submit(text, action = "video") else submit(text)
+            .setItems(arrayOf("Download the video", "Save a card image", "Just describe the text")) { _, which ->
+                when (which) {
+                    0 -> submit(text, action = "video")
+                    1 -> submit(text, action = "card")
+                    else -> submit(text)
+                }
             }
             .show()
     }
@@ -183,20 +192,41 @@ class MainActivity : Activity() {
         io.execute {
             val id = PocketClient.submit(text, workMs, action) ?: return@execute
             val job = PocketClient.awaitDone(id, timeoutMs = 180_000) ?: return@execute
-            val published = job.savedFile?.let(::publishToDownloads)
+            val published = publishFinished(job)
             Notifier.done(applicationContext, job, published)
             refresh()
         }
     }
 
+    /** A finished job is either a downloaded video or a card we draw ourselves. */
+    private fun publishFinished(job: PocketClient.Job): String? {
+        val raw = job.raw ?: return job.savedFile?.let { publishToDownloads(it, "video/mp4") }
+        if (raw.optString("kind") == "card") {
+            return publishCard(raw, job.id)
+        }
+        return job.savedFile?.let { publishToDownloads(it, "video/mp4") }
+    }
+
+    private fun publishCard(raw: org.json.JSONObject, id: String): String? {
+        val target = File(filesDir, "pocket/cards/${cardName(raw, id)}")
+        val rendered = CardRenderer.render(raw, target) ?: return null
+        return publishToDownloads(rendered.path, "image/png")
+    }
+
+    /** Name a card the way a person would look for it. */
+    private fun cardName(raw: org.json.JSONObject, id: String): String {
+        val postId = raw.optString("source").substringAfterLast('/').ifEmpty { id }
+        return "${raw.optString("author").ifEmpty { "post" }}_${postId}_card.png"
+    }
+
     /** MediaStore keeps the file visible in Files and Gallery, not buried in app data. */
-    private fun publishToDownloads(path: String): String? {
+    private fun publishToDownloads(path: String, mime: String): String? {
         return try {
         val source = File(path)
         if (!source.isFile) return null
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, source.name)
-            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+            put(MediaStore.MediaColumns.MIME_TYPE, mime)
             put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/Pocket")
         }
         val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)

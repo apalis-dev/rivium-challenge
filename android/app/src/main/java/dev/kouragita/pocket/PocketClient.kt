@@ -30,6 +30,7 @@ object PocketClient {
         val error: String?,
         val savedFile: String?,
         val savedBytes: Long?,
+        val raw: JSONObject?,
     ) {
         /** A retry is the product working, so it belongs on screen. */
         val recovered: Boolean get() = attempts > 1
@@ -143,6 +144,7 @@ object PocketClient {
             error = result?.optString("error")?.takeIf { it.isNotBlank() },
             savedFile = result?.optString("file")?.takeIf { it.isNotBlank() },
             savedBytes = result?.optLong("bytes")?.takeIf { it > 0 },
+            raw = result,
         )
     }
 }

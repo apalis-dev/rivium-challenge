@@ -27,6 +27,8 @@ object Notifier {
         val title = (if (failed) "Job failed" else "Job done") + " · " + job.text.take(30)
         val megabytes = job.savedBytes?.div(1_048_576.0)
         val body = when {
+            job.raw?.optString("kind") == "card" && published != null ->
+                "Card saved to Downloads/Pocket"
             job.savedFile != null && megabytes != null ->
                 "Saved ${"%.1f".format(megabytes)} MB to Downloads/Pocket" +
                     if (published == null) " (app storage)" else ""

@@ -78,9 +78,11 @@ pub async fn handle(
 ) -> Result<(), BoxDynError> {
     mark_running(&pool, &job).await?;
 
-    if job.action.as_deref() == Some("video") {
-        let dir: &Downloads = &downloads;
-        return archive(&pool, &job, &dir.0).await;
+    let dir: &Downloads = &downloads;
+    match job.action.as_deref() {
+        Some("video") => return archive(&pool, &job, &dir.0).await,
+        Some("card") => return capture_card(&pool, &job, &dir.0).await,
+        _ => {}
     }
 
     // Nothing to describe is permanent: retrying cannot fix it, so record the
@@ -118,6 +120,23 @@ async fn archive(
         Err(media::MediaError::Permanent(reason)) => record_failed(pool, job, &reason).await?,
         // A dropped connection is worth retrying: the next attempt resumes from
         // the bytes already on disk. Recording first keeps the row honest.
+        Err(media::MediaError::Transient(reason)) => {
+            record_failed(pool, job, &reason).await?;
+            return Err(reason.into());
+        }
+    }
+    Ok(())
+}
+
+/// Gather the post's public metadata and its images for the UI to draw.
+async fn capture_card(
+    pool: &SqlitePool,
+    job: &Job,
+    into: &std::path::Path,
+) -> Result<(), BoxDynError> {
+    match media::save_card(&job.text, into).await {
+        Ok(card) => record_json(pool, job, card).await?,
+        Err(media::MediaError::Permanent(reason)) => record_failed(pool, job, &reason).await?,
         Err(media::MediaError::Transient(reason)) => {
             record_failed(pool, job, &reason).await?;
             return Err(reason.into());
