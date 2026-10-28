@@ -112,16 +112,18 @@ async fn archive(
     into: &std::path::Path,
 ) -> Result<(), BoxDynError> {
     match media::save_video(&job.text, into).await {
-        Ok(saved) => {
-            record_json(pool, job, saved).await?;
-            Ok(())
-        }
-        Err(reason) => {
-            // A dead link is not worth five attempts; say what happened.
+        Ok(saved) => record_json(pool, job, saved).await?,
+        // A dead link or a post with no video will never succeed: record why
+        // and stop burning attempts.
+        Err(media::MediaError::Permanent(reason)) => record_failed(pool, job, &reason).await?,
+        // A dropped connection is worth retrying: the next attempt resumes from
+        // the bytes already on disk. Recording first keeps the row honest.
+        Err(media::MediaError::Transient(reason)) => {
             record_failed(pool, job, &reason).await?;
-            Ok(())
+            return Err(reason.into());
         }
     }
+    Ok(())
 }
 
 async fn mark_running(pool: &SqlitePool, job: &Job) -> Result<(), sqlx::Error> {

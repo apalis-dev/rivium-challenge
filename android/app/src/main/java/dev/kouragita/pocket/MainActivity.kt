@@ -78,6 +78,39 @@ class MainActivity : Activity() {
         super.onResume()
         polling = true
         handler.post(poll)
+        reconcilePublished()
+    }
+
+    /**
+     * A download that finished while the app was dead is still in app storage.
+     * Only safe to run once the host is serving, so call it from readiness too.
+     */
+    private fun reconcilePublished() {
+        io.execute {
+            PocketClient.list()
+                .filter { it.status == "done" && it.savedFile != null }
+                .forEach { job ->
+                    val name = File(job.savedFile!!).name
+                    if (!alreadyPublished(name)) {
+                        publishToDownloads(job.savedFile)?.let { published ->
+                            Notifier.done(applicationContext, job, published)
+                        }
+                    }
+                }
+        }
+    }
+
+    /** Our own inserts are visible to us, so this is enough to avoid duplicates. */
+    private fun alreadyPublished(name: String): Boolean = try {
+        contentResolver.query(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.MediaColumns._ID),
+            "${MediaStore.MediaColumns.DISPLAY_NAME} = ?",
+            arrayOf(name),
+            null,
+        )?.use { it.count > 0 } ?: false
+    } catch (_: Exception) {
+        false
     }
 
     override fun onPause() {

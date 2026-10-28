@@ -12,6 +12,22 @@ use tokio::io::AsyncWriteExt;
 const UA: &str = "Mozilla/5.0 (Linux; Android 15) x-pocket/0.1";
 const SYNDICATION: &str = "https://cdn.syndication.twimg.com/tweet-result?id={id}&lang=en&token=a";
 
+/// A failure the queue should not retry is permanent; everything else is worth
+/// another attempt, which resumes from the bytes already on disk.
+#[derive(Debug)]
+pub enum MediaError {
+    Permanent(String),
+    Transient(String),
+}
+
+impl MediaError {
+    pub fn reason(&self) -> &str {
+        match self {
+            Self::Permanent(reason) | Self::Transient(reason) => reason,
+        }
+    }
+}
+
 /// Where downloads land. Passed to the worker as data.
 #[derive(Clone, Debug)]
 pub struct Downloads(pub PathBuf);
@@ -32,27 +48,49 @@ pub fn post_id(link: &str) -> Option<String> {
     (id.len() >= 15).then_some(id)
 }
 
-fn client() -> Result<reqwest::Client, String> {
+/// reqwest hides the useful part in the source chain; keep all of it.
+fn describe(error: &reqwest::Error) -> String {
+    use std::error::Error as _;
+    let mut text = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        text.push_str(&format!(" <- {cause}"));
+        source = cause.source();
+    }
+    text
+}
+
+fn client() -> Result<reqwest::Client, MediaError> {
     reqwest::Client::builder()
         .user_agent(UA)
-        .timeout(std::time::Duration::from_secs(120))
+        .timeout(std::time::Duration::from_secs(300))
         .build()
-        .map_err(|e| format!("client: {e}"))
+        .map_err(|e| MediaError::Transient(format!("cannot set up the http client: {e}")))
 }
 
 /// Ask X for the post and pick the best mp4.
-pub async fn resolve(link: &str) -> Result<Resolved, String> {
-    let id = post_id(link).ok_or_else(|| format!("not an X post link: {link}"))?;
+pub async fn resolve(link: &str) -> Result<Resolved, MediaError> {
+    let id = post_id(link)
+        .ok_or_else(|| MediaError::Permanent(format!("not an X post link: {link}")))?;
     let url = SYNDICATION.replace("{id}", &id);
 
-    let response = client()?.get(&url).send().await.map_err(|e| format!("fetch: {e}"))?;
+    let response = client()?
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| MediaError::Transient(format!("could not reach X: {}", describe(&e))))?;
     if !response.status().is_success() {
-        return Err(format!("post {id}: HTTP {}", response.status()));
+        return Err(MediaError::Permanent(format!("post {id}: HTTP {}", response.status())));
     }
-    let body: Value = response.json().await.map_err(|e| format!("decode: {e}"))?;
+    let body: Value = response
+        .json()
+        .await
+        .map_err(|e| MediaError::Transient(format!("unreadable reply from X: {e}")))?;
 
     if body.get("__typename").and_then(Value::as_str) == Some("TweetTombstone") {
-        return Err(format!("post {id} is not publicly available"));
+        return Err(MediaError::Permanent(format!(
+            "post {id} is not publicly available (deleted, protected or limited)"
+        )));
     }
 
     let author = body
@@ -92,36 +130,80 @@ pub async fn resolve(link: &str) -> Result<Resolved, String> {
         }
     }
 
-    best.ok_or_else(|| format!("post {id} has no video (text or photos only)"))
+    best.ok_or_else(|| MediaError::Permanent(format!("post {id} has no video")))
 }
 
-/// Stream the file to disk, a chunk at a time.
-pub async fn download(url: &str, path: &Path) -> Result<u64, String> {
-    let mut response = client()?.get(url).send().await.map_err(|e| format!("stream: {e}"))?;
-    if !response.status().is_success() {
-        return Err(format!("stream: HTTP {}", response.status()));
-    }
-
-    if let Some(parent) = path.parent() {
+/// Stream to `<name>.part`, resuming from whatever is already there, and only
+/// rename to the final name once the file is complete. A dropped connection
+/// therefore costs the bytes missed, not the whole download.
+pub async fn download(url: &str, path: &Path) -> Result<u64, MediaError> {
+    let part = path.with_file_name(format!(
+        "{}.part",
+        path.file_name().and_then(|n| n.to_str()).unwrap_or("download")
+    ));
+    if let Some(parent) = part.parent() {
         tokio::fs::create_dir_all(parent)
             .await
-            .map_err(|e| format!("mkdir: {e}"))?;
+            .map_err(|e| MediaError::Transient(format!("cannot create the download folder: {e}")))?;
     }
 
-    let mut file = tokio::fs::File::create(path)
+    let mut already = tokio::fs::metadata(&part).await.map(|m| m.len()).unwrap_or(0);
+    let mut request = client()?.get(url);
+    if already > 0 {
+        request = request.header("range", format!("bytes={already}-"));
+    }
+    let mut response = request
+        .send()
         .await
-        .map_err(|e| format!("create: {e}"))?;
-    let mut written = 0u64;
-    while let Some(chunk) = response.chunk().await.map_err(|e| format!("read: {e}"))? {
-        file.write_all(&chunk).await.map_err(|e| format!("write: {e}"))?;
+        .map_err(|e| MediaError::Transient(format!("download interrupted: {}", describe(&e))))?;
+
+    let status = response.status();
+    let resuming = status == reqwest::StatusCode::PARTIAL_CONTENT;
+    if !status.is_success() {
+        return Err(MediaError::Transient(format!("stream refused: HTTP {status}")));
+    }
+    if already > 0 && !resuming {
+        // The server chose to send the whole file; start over cleanly.
+        already = 0;
+    }
+
+    let mut file = if resuming {
+        tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&part)
+            .await
+            .map_err(|e| MediaError::Transient(format!("cannot reopen the partial file: {e}")))?
+    } else {
+        tokio::fs::File::create(&part)
+            .await
+            .map_err(|e| MediaError::Transient(format!("cannot create the partial file: {e}")))?
+    };
+
+    let mut written = already;
+    loop {
+        let chunk = response
+            .chunk()
+            .await
+            .map_err(|e| MediaError::Transient(format!("connection dropped while downloading: {e}")))?;
+        let Some(chunk) = chunk else { break };
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| MediaError::Transient(format!("cannot write to storage: {e}")))?;
         written += chunk.len() as u64;
     }
-    file.flush().await.map_err(|e| format!("flush: {e}"))?;
+    file.flush()
+        .await
+        .map_err(|e| MediaError::Transient(format!("cannot flush to storage: {e}")))?;
+    drop(file);
+
+    tokio::fs::rename(&part, path)
+        .await
+        .map_err(|e| MediaError::Transient(format!("cannot finalise the file: {e}")))?;
     Ok(written)
 }
 
 /// Save one link: resolve it, download the best stream, report what happened.
-pub async fn save_video(link: &str, into: &Path) -> Result<Value, String> {
+pub async fn save_video(link: &str, into: &Path) -> Result<Value, MediaError> {
     let resolved = resolve(link).await?;
     let name = format!(
         "{}_{}p.mp4",
