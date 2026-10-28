@@ -48,10 +48,18 @@ class MainActivity : Activity() {
         status = TextView(this).apply { text = "starting…"; textSize = 14f }
         jobs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
+        val hint = TextView(this).apply {
+            text = "Share text from any app to add a job. Long-press or select text, " +
+                "tap Share, then pick Pocket."
+            textSize = 14f
+            setPadding(0, 12, 0, 24)
+        }
+
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 96, 48, 48)
             addView(status)
+            addView(hint)
             addView(jobs)
         }
         return ScrollView(this).apply { addView(column) }
@@ -78,7 +86,7 @@ class MainActivity : Activity() {
     private fun render(current: List<PocketClient.Job>) {
         jobs.removeAllViews()
         if (current.isEmpty()) {
-            jobs.addView(TextView(this).apply { text = "no jobs yet" })
+            jobs.addView(TextView(this).apply { text = "no jobs yet — share some text to add one" })
             return
         }
         current.forEach { job ->
