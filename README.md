@@ -215,3 +215,8 @@ src/main.rs     laptop entry point (process host)
 src/lib.rs      JNI export for Android (embedded host)
 android/        Kotlin app: share sheet, notification, job list
 ```
+
+## Contact
+
+Questions, corrections or review comments: [@kouragitamaster](https://x.com/kouragitamaster)
+on X.
