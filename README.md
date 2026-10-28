@@ -184,6 +184,14 @@ request, so a dropped connection costs what was missed rather than the whole fil
 Verified by killing the app mid-transfer — 3.5 MB on disk, relaunched, finished at
 exactly 11,493,459 bytes on attempt 2.
 
+Saved posts are also **filed by what they are about**, so the list reads like a
+library instead of a feed. The worker derives up to three topics from the post's
+text: a small keyword table (space, football, tech, ai, finance, education, health,
+design, jobs) plus any hashtags. Each row shows the post's thumbnail, its topic and
+its result, and the list groups under a heading per topic, with `Unsorted` last.
+Classification is deliberately coarse and offline — it will miss nuance, and it
+says so rather than guessing with a model.
+
 Three deliberate limits:
 
 - **No foreground service.** The system may kill a transfer (it did, via SIGKILL). That

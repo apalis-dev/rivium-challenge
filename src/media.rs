@@ -28,6 +28,45 @@ impl MediaError {
     }
 }
 
+/// Coarse buckets, deliberately small and readable. A post can land in more
+/// than one; three is the cap so the list stays useful.
+const BUCKETS: &[(&str, &[&str])] = &[
+    ("space", &["nasa", "space", "orbit", "rocket", "satellite", "astronaut", "lunar", "mars", "station"]),
+    ("football", &["football", "soccer", "goal", "fifa", "premier", "league", "striker"]),
+    ("tech", &["rust", "code", "coding", "programming", "software", "developer", "linux", "android", "api", "database"]),
+    ("ai", &["ai", "model", "llm", "neural", "inference", "agent"]),
+    ("finance", &["market", "stocks", "crypto", "bitcoin", "earnings", "inflation", "invest", "money"]),
+    ("education", &["learn", "tutorial", "course", "lesson", "explained", "guide", "how to"]),
+    ("health", &["health", "medical", "vaccine", "doctor", "hospital", "mental"]),
+    ("design", &["design", "ui", "ux", "typography", "figma", "layout"]),
+    ("jobs", &["job", "hiring", "career", "interview", "apply", "recruit"]),
+];
+
+/// What a post is about: matched buckets, then any hashtags, capped at three.
+pub fn topics(text: &str) -> Vec<String> {
+    let lower = text.to_lowercase();
+    let mut found: Vec<String> = BUCKETS
+        .iter()
+        .filter(|(_, words)| words.iter().any(|word| lower.contains(word)))
+        .map(|(name, _)| (*name).to_owned())
+        .collect();
+
+    for word in text.split_whitespace() {
+        let Some(tag) = word.strip_prefix('#') else { continue };
+        let clean: String = tag
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect::<String>()
+            .to_lowercase();
+        if clean.len() >= 3 && !found.contains(&clean) {
+            found.push(clean);
+        }
+    }
+
+    found.truncate(3);
+    found
+}
+
 /// Where downloads land. Passed to the worker as data.
 #[derive(Clone, Debug)]
 pub struct Downloads(pub PathBuf);
@@ -38,6 +77,8 @@ pub struct Resolved {
     pub url: String,
     pub height: u32,
     pub bitrate: u64,
+    pub text: String,
+    pub thumb_url: Option<String>,
 }
 
 pub fn post_id(link: &str) -> Option<String> {
@@ -104,6 +145,11 @@ pub async fn resolve(link: &str) -> Result<Resolved, MediaError> {
         .and_then(Value::as_str)
         .unwrap_or("unknown")
         .to_owned();
+    let text = body.get("text").and_then(Value::as_str).unwrap_or_default().to_owned();
+    let thumb_url = body
+        .pointer("/mediaDetails/0/media_url_https")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
 
     let mut best: Option<Resolved> = None;
     if let Some(media) = body.get("mediaDetails").and_then(Value::as_array) {
@@ -130,6 +176,8 @@ pub async fn resolve(link: &str) -> Result<Resolved, MediaError> {
                         url: stream.to_owned(),
                         height,
                         bitrate,
+                        text: text.clone(),
+                        thumb_url: thumb_url.clone(),
                     });
                 }
             }
@@ -219,6 +267,14 @@ pub async fn save_video(link: &str, into: &Path) -> Result<Value, MediaError> {
     let path = into.join(&name);
     let bytes = download(&resolved.url, &path).await?;
 
+    let mut thumb = None;
+    if let Some(url) = &resolved.thumb_url {
+        let image = into.join(format!("{}.jpg", path.file_stem().and_then(|s| s.to_str()).unwrap_or("post")));
+        if download(url, &image).await.is_ok() {
+            thumb = Some(image.to_string_lossy().to_string());
+        }
+    }
+
     Ok(serde_json::json!({
         "file": path.to_string_lossy(),
         "name": name,
@@ -226,6 +282,8 @@ pub async fn save_video(link: &str, into: &Path) -> Result<Value, MediaError> {
         "height": resolved.height,
         "bitrate": resolved.bitrate,
         "author": resolved.author,
+        "topics": topics(&resolved.text),
+        "thumb": thumb,
     }))
 }
 
@@ -278,6 +336,34 @@ pub async fn save_card(link: &str, into: &Path) -> Result<Value, MediaError> {
         "text": text,
         "avatar": avatar,
         "thumb": thumb,
+        "topics": topics(&text),
         "source": format!("x.com/{handle}/status/{id}"),
     }))
+}
+
+#[cfg(test)]
+mod topic_tests {
+    use super::topics;
+
+    #[test]
+    fn a_space_post_lands_in_space() {
+        assert_eq!(topics("Crew-13 arrived at the Space Station"), vec!["space"]);
+    }
+
+    #[test]
+    fn hashtags_are_kept_and_de_duplicated() {
+        let found = topics("#Rust is lovely #rust");
+        assert_eq!(found, vec!["tech", "rust"]);
+    }
+
+    #[test]
+    fn unknown_text_is_unsorted() {
+        assert!(topics("good morning everyone").is_empty());
+    }
+
+    #[test]
+    fn at_most_three_topics() {
+        let found = topics("#one #two #three #four rocket");
+        assert!(found.len() <= 3, "{found:?}");
+    }
 }

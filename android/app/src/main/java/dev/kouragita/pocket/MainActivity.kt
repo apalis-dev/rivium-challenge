@@ -9,7 +9,9 @@ import android.content.pm.PackageManager
 import android.os.Environment
 import android.provider.MediaStore
 import java.io.File
+import android.graphics.BitmapFactory
 import android.graphics.drawable.GradientDrawable
+import android.widget.ImageView
 import android.view.View
 import android.os.Build
 import android.os.Bundle
@@ -266,7 +268,36 @@ class MainActivity : Activity() {
         hint.visibility = if (current.isEmpty()) LinearLayout.VISIBLE else LinearLayout.GONE
 
         jobs.removeAllViews()
-        current.forEach { jobs.addView(row(it)) }
+        val groups = current.groupBy { it.topics.firstOrNull() ?: "Unsorted" }
+        groups.keys
+            .sortedWith(compareBy({ it == "Unsorted" }, { it.lowercase() }))
+            .forEach { topic ->
+                jobs.addView(heading(topic, groups.getValue(topic).size))
+                groups.getValue(topic).forEach { jobs.addView(row(it)) }
+            }
+    }
+
+    /** Decode a saved thumbnail at list size rather than full resolution. */
+    private fun thumbnail(path: String?): android.graphics.Bitmap? {
+        if (path == null) return null
+        return try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(path, bounds)
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= 480) sample *= 2
+            BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Section heading: the context a person would look under. */
+    private fun heading(topic: String, count: Int): TextView = TextView(this).apply {
+        text = "${topic.replaceFirstChar { it.uppercase() }}  ·  $count"
+        textSize = 13f
+        letterSpacing = 0.08f
+        setPadding(0, 28, 0, 10)
+        alpha = 0.75f
     }
 
     private fun row(job: PocketClient.Job): View {
@@ -285,19 +316,42 @@ class MainActivity : Activity() {
             setOnClickListener { showDetail(job) }
         }
 
-        card.addView(chip(job))
-        card.addView(TextView(this).apply {
-            text = job.text.take(120)
+        val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+
+        thumbnail(job.thumb)?.let { bitmap ->
+            body.addView(
+                ImageView(this).apply {
+                    setImageBitmap(bitmap)
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        (170 * resources.displayMetrics.density).toInt(),
+                    ).apply { bottomMargin = 16 }
+                },
+            )
+        }
+
+        body.addView(chip(job))
+        body.addView(TextView(this).apply {
+            text = job.text.take(140)
             textSize = 15f
             setPadding(0, 6, 0, 6)
         })
+        if (job.topics.isNotEmpty()) {
+            body.addView(TextView(this).apply {
+                text = job.topics.joinToString("   ") { "#$it" }
+                textSize = 12f
+                alpha = 0.65f
+            })
+        }
         job.detail.takeIf { it.isNotEmpty() }?.let { detail ->
-            card.addView(TextView(this).apply {
+            body.addView(TextView(this).apply {
                 text = detail
                 textSize = 13f
                 alpha = 0.7f
             })
         }
+        card.addView(body)
         return card
     }
 
