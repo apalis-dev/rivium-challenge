@@ -51,9 +51,12 @@ A finished text job arrives as a notification carrying **Copy hash** and **Share
 
 ![notification](docs/pocket-notification.png)
 
-[`docs/pocket-story.mp4`](docs/pocket-story.mp4) is the recorded flow on the phone: a
-post shared from the X app, a format chosen, the job running, the app killed while it was
-in flight, and the same job recovered and published after reopening.
+[`docs/pocket-story.mp4`](docs/pocket-story.mp4) is the recorded flow on the phone: the
+F1 post open in the X app, Share, Share via…, Pocket, **Download the video**, the row coming
+back after a mid-transfer kill as `running · recovered · attempt 2` under a summary reading
+"1 working", and finally the finished 84 MB file in Downloads. One honest cut: the transfer
+was still running when the take ended, so the last few seconds are a second clip of the
+completed file rather than the same continuous shot.
 
 ## How it works
 
