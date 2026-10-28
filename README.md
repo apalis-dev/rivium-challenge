@@ -24,14 +24,24 @@ system killing it, loses nothing. Reopen and the work finishes.
 One job type: count the characters and words, find the distinct words, and take an
 FNV-1a hash so the same text always gives the same fingerprint.
 
+Four states, all captured on the phone. Empty, and working:
+
+![empty state](docs/pocket-empty.png)
+
+![a job working](docs/pocket-working.png)
+
+Once jobs exist, the list distinguishes them at a glance — `done`, an amber
+`recovered · attempt 2`, and a red `failed`:
+
 ![job list on the phone](docs/pocket-list.png)
 
-Note the `done · attempt 2` entry — that job was killed mid-flight and recovered by
-the next launch. When it finishes, the result arrives as a notification:
+A finished job arrives as a notification carrying **Copy hash** and **Share result**:
 
 ![notification](docs/pocket-notification.png)
 
-Both are from the phone. A short recording of the flow is in [`docs/share.gif`](docs/share.gif).
+[`docs/share.gif`](docs/share.gif) is a 24-second recording on the phone: **Slow job (6s)**
+is tapped, the row shows `running`, the process is force-stopped mid-job, and after
+reopening the same job comes back as `done · recovered · attempt 2`.
 
 ## How it works
 
