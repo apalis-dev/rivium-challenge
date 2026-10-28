@@ -40,7 +40,9 @@ object PocketClient {
         val statusLine: String
             get() = buildString {
                 append(status)
-                if (recovered) append(" · recovered · attempt $attempts")
+                // A failed job that was attempted five times is not "recovered".
+                if (recovered && status != "failed") append(" · recovered · attempt $attempts")
+                else if (recovered) append(" · attempt $attempts")
             }
 
         val detail: String get() = error ?: outcome?.summary.orEmpty()
@@ -81,6 +83,13 @@ object PocketClient {
             Thread.sleep(300)
         }
         return null
+    }
+
+    /** True once the loopback listener answers; used before reconciling. */
+    fun isReady(): Boolean = try {
+        getRaw("$BASE/readyz") != null
+    } catch (_: Exception) {
+        false
     }
 
     fun list(): List<Job> = try {

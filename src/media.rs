@@ -73,6 +73,7 @@ pub struct Downloads(pub PathBuf);
 
 /// What we learned about a post before downloading it.
 pub struct Resolved {
+    pub id: String,
     pub author: String,
     pub url: String,
     pub height: u32,
@@ -172,6 +173,7 @@ pub async fn resolve(link: &str) -> Result<Resolved, MediaError> {
                     .unwrap_or(0);
                 if best.as_ref().is_none_or(|current| bitrate > current.bitrate) {
                     best = Some(Resolved {
+                        id: id.clone(),
                         author: author.clone(),
                         url: stream.to_owned(),
                         height,
@@ -259,9 +261,12 @@ pub async fn download(url: &str, path: &Path) -> Result<u64, MediaError> {
 /// Save one link: resolve it, download the best stream, report what happened.
 pub async fn save_video(link: &str, into: &Path) -> Result<Value, MediaError> {
     let resolved = resolve(link).await?;
+    // The post id keeps two videos from the same author from overwriting each
+    // other, which used to break the link from a job to its file.
     let name = format!(
-        "{}_{}p.mp4",
+        "{}_{}_{}p.mp4",
         resolved.author,
+        resolved.id,
         if resolved.height > 0 { resolved.height.to_string() } else { "video".into() }
     );
     let path = into.join(&name);

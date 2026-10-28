@@ -184,6 +184,14 @@ request, so a dropped connection costs what was missed rather than the whole fil
 Verified by killing the app mid-transfer — 3.5 MB on disk, relaunched, finished at
 exactly 11,493,459 bytes on attempt 2.
 
+Saved posts keep their thumbnail, so the list leads with the image and the topic:
+
+![the library, grouped by topic](docs/pocket-library.png)
+
+A card saved from a link, drawn on the device:
+
+![a saved card](docs/pocket-card.png)
+
 Saved posts are also **filed by what they are about**, so the list reads like a
 library instead of a feed. The worker derives up to three topics from the post's
 text: a small keyword table (space, football, tech, ai, finance, education, health,
@@ -202,6 +210,15 @@ Three deliberate limits:
   a feature the desktop CLI already does. `x-archive --audio` covers it.
 - **Public posts only.** Protected, deleted or limited posts return a tombstone and are
   reported as unavailable; nothing is worked around.
+
+## Dependencies
+
+This branch adds exactly one dependency beyond the challenge libraries: `reqwest`
+with `rustls-tls`, so the worker can reach X over HTTPS from the device. Hand-rolling
+TLS and HTTP parsing would be more code and more ways to be wrong, and `rustls` plus
+`ring` cross-compile for arm64 with the NDK — verified by building the library for
+`aarch64-linux-android` and running the request on the phone. `tokio` gains only
+`fs` and `io-util` for streaming to disk. SQLite, Rivium and Apalis are unchanged.
 
 ## What survives what
 

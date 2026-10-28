@@ -64,6 +64,8 @@ class MainActivity : Activity() {
                     is Host.Result.Failed -> "host failed (${result.code}): ${result.message}"
                 }
                 refresh()
+                // The listener is up now, so reconciliation can actually read.
+                reconcilePublished()
             }
         }
 
@@ -87,8 +89,13 @@ class MainActivity : Activity() {
      * A download that finished while the app was dead is still in app storage.
      * Only safe to run once the host is serving, so call it from readiness too.
      */
-    private fun reconcilePublished() {
+    private fun reconcilePublished(attempt: Int = 0) {
         io.execute {
+            if (!PocketClient.isReady() && attempt < 5) {
+                // On a cold start the listener can still be binding; try again shortly.
+                handler.postDelayed({ reconcilePublished(attempt + 1) }, 1_000)
+                return@execute
+            }
             PocketClient.list()
                 .filter { it.status == "done" }
                 .forEach { job ->
@@ -202,11 +209,14 @@ class MainActivity : Activity() {
 
     /** A finished job is either a downloaded video or a card we draw ourselves. */
     private fun publishFinished(job: PocketClient.Job): String? {
-        val raw = job.raw ?: return job.savedFile?.let { publishToDownloads(it, "video/mp4") }
-        if (raw.optString("kind") == "card") {
-            return publishCard(raw, job.id)
+        val raw = job.raw
+        if (raw != null && raw.optString("kind") == "card") {
+            val name = cardName(raw, job.id)
+            return if (alreadyPublished(name)) name else publishCard(raw, job.id)
         }
-        return job.savedFile?.let { publishToDownloads(it, "video/mp4") }
+        val path = job.savedFile ?: return null
+        val name = File(path).name
+        return if (alreadyPublished(name)) name else publishToDownloads(path, "video/mp4")
     }
 
     private fun publishCard(raw: org.json.JSONObject, id: String): String? {
