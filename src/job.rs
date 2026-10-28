@@ -62,27 +62,66 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 
 /// Apalis calls this once per attempt. It is idempotent: re-running a job
 /// overwrites the same row instead of adding a second result.
+///
+/// Every exit path leaves `job_view` telling the truth. A job that cannot run
+/// must never sit at `running` forever, which is what happens if the only
+/// writes are "running" and "done".
 pub async fn handle(job: Job, pool: Data<SqlitePool>) -> Result<(), BoxDynError> {
-    sqlx::query("UPDATE job_view SET status = 'running', attempts = attempts + 1 WHERE id = ?1")
-        .bind(&job.id)
-        .execute(&*pool)
-        .await?;
+    mark_running(&pool, &job).await?;
+
+    // Nothing to describe is permanent: retrying cannot fix it, so record the
+    // reason and finish rather than burning five attempts.
+    if job.text.trim().is_empty() {
+        record_failed(&pool, &job, "nothing to describe").await?;
+        return Ok(());
+    }
 
     if let Some(ms) = job.work_ms {
         tokio::time::sleep(Duration::from_millis(ms)).await;
     }
 
-    let outcome = job.run();
-    sqlx::query(
-        "UPDATE job_view SET status = 'done', result = ?2, done_at = ?3 WHERE id = ?1",
-    )
-    .bind(&job.id)
-    .bind(serde_json::to_string(&outcome)?)
-    .bind(crate::queue::now_ms())
-    .execute(&*pool)
-    .await?;
+    // A real error is transient: say why, then let Apalis retry. The next
+    // attempt puts the row back to `running`; if the attempts run out, the row
+    // rests at `failed` with the reason, which is still the truth.
+    if let Err(error) = record_done(&pool, &job).await {
+        let _ = record_failed(&pool, &job, &error.to_string()).await;
+        return Err(error);
+    }
 
     Ok(())
+}
+
+async fn mark_running(pool: &SqlitePool, job: &Job) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE job_view SET status = 'running', attempts = attempts + 1, done_at = NULL \
+         WHERE id = ?1",
+    )
+    .bind(&job.id)
+    .execute(pool)
+    .await
+    .map(|_| ())
+}
+
+async fn record_done(pool: &SqlitePool, job: &Job) -> Result<(), BoxDynError> {
+    let outcome = serde_json::to_string(&job.run())?;
+    sqlx::query("UPDATE job_view SET status = 'done', result = ?2, done_at = ?3 WHERE id = ?1")
+        .bind(&job.id)
+        .bind(outcome)
+        .bind(crate::queue::now_ms())
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+async fn record_failed(pool: &SqlitePool, job: &Job, reason: &str) -> Result<(), sqlx::Error> {
+    let result = serde_json::json!({ "error": reason }).to_string();
+    sqlx::query("UPDATE job_view SET status = 'failed', result = ?2, done_at = ?3 WHERE id = ?1")
+        .bind(&job.id)
+        .bind(result)
+        .bind(crate::queue::now_ms())
+        .execute(pool)
+        .await
+        .map(|_| ())
 }
 
 #[cfg(test)]
