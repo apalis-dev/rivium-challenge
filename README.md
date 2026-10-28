@@ -35,13 +35,23 @@ Once jobs exist, the list distinguishes them at a glance — `done`, an amber
 
 ![job list on the phone](docs/pocket-list.png)
 
+A job that cannot succeed is not left pretending to run — it records why:
+
+![failed state](docs/pocket-failed.png)
+
+Tapping any row opens the full result, with the attempt count and the hash in monospace:
+
+![detail view](docs/pocket-detail.png)
+
 A finished job arrives as a notification carrying **Copy hash** and **Share result**:
 
 ![notification](docs/pocket-notification.png)
 
-[`docs/share.gif`](docs/share.gif) is a 24-second recording on the phone: **Slow job (6s)**
-is tapped, the row shows `running`, the process is force-stopped mid-job, and after
-reopening the same job comes back as `done · recovered · attempt 2`.
+[`docs/share.gif`](docs/share.gif) is one continuous recording on the phone, about 42
+seconds: the app open, the Android share sheet with Pocket in it, the share arriving as a
+job, the result appearing as a heads-up notification, **Slow job (6s)** tapped, the row
+reading `running`, the process force-stopped, and after reopening the same job back at the
+top of the list as `done · recovered · attempt 2`.
 
 ## How it works
 
@@ -193,6 +203,19 @@ In the app the same job renders as `done · recovered · attempt 2`. That line i
 whole point: it exists because a worker died and the queue kept the promise, and no
 ordinary to-do app can show it.
 
+## When a job cannot succeed
+
+The failure path is recorded rather than assumed. With the single worker busy on a slow
+job, submit text that is only whitespace:
+
+```text
+before   pending | attempts 0 | result None
+after    failed  | attempts 1 | result {"error":"nothing to describe"}
+```
+
+It is not retried, because retrying cannot turn whitespace into something to describe,
+and the row says so instead of sitting at `running` forever.
+
 ## On a real phone
 
 Tested on a TECNO KM7k running Android 15 (API 35), arm64-v8a. Rivium's own Android
@@ -243,9 +266,10 @@ Pinned exactly; `Cargo.lock` is committed.
   another device.
 - No foreground service: the app is allowed to die, which is exactly the behaviour the
   persistence story depends on.
-- The completion notification carries "Copy result" and "Share result" actions. Both are
-  attached and the receiver is registered, but they were verified by inspecting the posted
-  notification rather than by tapping them on the phone.
+- The notification carries **Copy hash** and **Share result**. Copy hash was tapped on the
+  phone and the receiver logged `copied hash f3f9b7f5e7e47110` — the full sixteen
+  characters. Share result is attached and visible in the notification, but its tap was
+  not captured.
 - One job type, by design.
 
 ## Layout
