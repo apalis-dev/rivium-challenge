@@ -136,6 +136,10 @@ Open the app once so the host starts, then share text from any other app. The fi
 share works too: it retries until the host is ready, because a share can launch the
 process before Rivium has finished starting.
 
+Two buttons in the app post to the same endpoint a share uses, so you can exercise
+everything without leaving the app or touching a terminal: **Try a sample**, and
+**Slow job (6s)** for watching recovery.
+
 ```sh
 adb forward tcp:8787 tcp:8787  # optional: poke the phone's queue from the laptop
 curl -s localhost:8787/readyz
@@ -148,9 +152,36 @@ curl -s localhost:8787/readyz
 | App closed normally | Job stays on disk, finishes on next launch |
 | `am force-stop` mid-job | Row stays `running`; next launch reclaims it, `attempts` → 2 |
 | Process killed mid-job | Same — the row is on disk, not in memory |
-| Job fails | Retried up to 5 attempts with backoff |
+| Job fails | Retried up to 5 attempts with backoff; the row says `failed` and why |
+| Job cannot succeed (empty text) | Recorded as `failed` immediately, not retried pointlessly |
 | Shutdown with a job running | Listener stops, worker drains, exit code 0 |
 
+
+## What happens if I kill it
+
+The claim is that nothing is lost. Three commands show it on a phone:
+
+```sh
+adb forward tcp:8787 tcp:8787
+ID=$(curl -s -X POST localhost:8787/jobs -H 'content-type: application/json' \
+  -d '{"text":"kill me mid job","work_ms":8000}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])')
+curl -s localhost:8787/jobs/$ID          # wait for "status":"running"
+adb shell am force-stop dev.kouragita.pocket
+adb shell am start -n dev.kouragita.pocket/.MainActivity
+curl -s localhost:8787/jobs/$ID          # now "done", "attempts":2
+```
+
+What that produced on the phone:
+
+```text
+claimed after ~900ms:   running | attempts 1
+force-stop → process gone; row pulled from the device database: running|1
+relaunch → recovered after 9s → done | attempts 2
+```
+
+In the app the same job renders as `done · recovered · attempt 2`. That line is the
+whole point: it exists because a worker died and the queue kept the promise, and no
+ordinary to-do app can show it.
 
 ## On a real phone
 
@@ -202,6 +233,9 @@ Pinned exactly; `Cargo.lock` is committed.
   another device.
 - No foreground service: the app is allowed to die, which is exactly the behaviour the
   persistence story depends on.
+- The completion notification carries "Copy result" and "Share result" actions. Both are
+  attached and the receiver is registered, but they were verified by inspecting the posted
+  notification rather than by tapping them on the phone.
 - One job type, by design.
 
 ## Layout
