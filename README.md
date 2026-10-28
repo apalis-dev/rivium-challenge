@@ -47,7 +47,7 @@ A finished job shows its statistics, the attempt count, and the hash in monospac
 
 ![detail of a finished job](docs/pocket-detail-result.png)
 
-A finished job arrives as a notification carrying **Copy hash** and **Share result**:
+A finished text job arrives as a notification carrying **Copy hash** and **Share result**. A saved post announces where the file went and offers **Share result**:
 
 ![notification](docs/pocket-notification.png)
 
@@ -184,6 +184,16 @@ request, so a dropped connection costs what was missed rather than the whole fil
 Verified by killing the app mid-transfer — 3.5 MB on disk, relaunched, finished at
 exactly 11,493,459 bytes on attempt 2.
 
+Publishing follows the job, not the lifecycle. A transfer that finishes while the
+screen is open is copied to `Downloads/Pocket` immediately and announces itself; one
+that finishes while the app is closed is published on the next launch. Verified with a
+fresh kill on a post that had never been saved: interrupted at 9,367,808 bytes,
+relaunched, resumed to 16,446,132 bytes, the stream stalled, interrupted again, and the
+finished 25,676,195-byte file appeared in Downloads/Pocket with the app in the
+foreground throughout. A copy is only recorded once its byte count matches the source, so a kill
+mid-copy cannot leave a truncated file behind under a name that later checks would
+trust.
+
 Saved posts keep their thumbnail, so the list leads with the image and the topic:
 
 ![the library, grouped by topic](docs/pocket-library.png)
@@ -227,7 +237,8 @@ TLS and HTTP parsing would be more code and more ways to be wrong, and `rustls` 
 | App closed normally | Job stays on disk, finishes on next launch |
 | `am force-stop` mid-job | Row stays `running`; next launch reclaims it, `attempts` → 2 |
 | Process killed mid-job | Same — the row is on disk, not in memory |
-| Job fails | Retried up to 5 attempts with backoff; the row says `failed` and why |
+| Job fails | Retried with backoff up to the queue's own attempt budget; the row says `failed` and why |
+| Transfer keeps getting interrupted | Each interruption resumes from the bytes on disk. The count on a row is how many times the worker has run it, so it can exceed the queue's own retry budget; a transfer is abandoned with a reason after several runs |
 | Job cannot succeed (empty text) | Recorded as `failed` immediately, not retried pointlessly |
 | Shutdown with a job running | Listener stops, worker drains, exit code 0 |
 

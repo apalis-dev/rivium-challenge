@@ -107,12 +107,29 @@ pub async fn handle(
     Ok(())
 }
 
+/// How many interruptions a single transfer may survive before it is dropped.
+const MAX_INTERRUPTIONS: i64 = 6;
+
 /// Resolve the shared link and save its best stream, then record where it went.
 async fn archive(
     pool: &SqlitePool,
     job: &Job,
     into: &std::path::Path,
 ) -> Result<(), BoxDynError> {
+    // Interruptions do not spend the queue's attempt budget, so a transfer that
+    // keeps dying would resume forever and hold the worker. Give up eventually.
+    let attempts: i64 = sqlx::query_scalar("SELECT attempts FROM job_view WHERE id = ?1")
+        .bind(&job.id)
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or(0);
+    if attempts > MAX_INTERRUPTIONS {
+        record_failed(pool, job, "abandoned after repeated interruptions").await?;
+        return Ok(());
+    }
+
     match media::save_video(&job.text, into).await {
         Ok(saved) => record_json(pool, job, saved).await?,
         // A dead link or a post with no video will never succeed: record why

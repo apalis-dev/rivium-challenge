@@ -235,6 +235,37 @@ pub async fn download(url: &str, path: &Path) -> Result<u64, MediaError> {
             .map_err(|e| MediaError::Transient(format!("cannot create the partial file: {e}")))?
     };
 
+    // Hold the transfer to whatever total the server promised.
+    if resuming {
+        // Appending a range that starts anywhere else would splice the file
+        // together wrong, and could still add up to the right total.
+        let start = response
+            .headers()
+            .get("content-range")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.split_whitespace().nth(1))
+            .and_then(|range| range.split('-').next())
+            .and_then(|from| from.trim().parse::<u64>().ok());
+        if start != Some(already) {
+            let _ = tokio::fs::remove_file(&part).await;
+            return Err(MediaError::Transient(
+                "server sent an unexpected range; starting this download again".into(),
+            ));
+        }
+    }
+
+    let mut expected = if resuming {
+        response
+            .headers()
+            .get("content-range")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.rsplit('/').next())
+            .and_then(|total| total.trim().parse::<u64>().ok())
+            .filter(|total| *total > 0)
+    } else {
+        response.content_length()
+    };
+
     let mut written = already;
     loop {
         let chunk = response
@@ -251,6 +282,19 @@ pub async fn download(url: &str, path: &Path) -> Result<u64, MediaError> {
         .await
         .map_err(|e| MediaError::Transient(format!("cannot flush to storage: {e}")))?;
     drop(file);
+
+    // A connection that closes early can look like a clean end of stream, so
+    // compare what arrived with what was promised before renaming.
+    if expected.is_none() {
+        expected = tokio::fs::metadata(&part).await.ok().map(|meta| meta.len());
+    }
+    if let Some(total) = expected
+        && written != total
+    {
+        return Err(MediaError::Transient(format!(
+            "incomplete download: {written} of {total} bytes"
+        )));
+    }
 
     tokio::fs::rename(&part, path)
         .await

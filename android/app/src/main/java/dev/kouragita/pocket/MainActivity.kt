@@ -47,6 +47,9 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Job ids already handed to MediaStore this session. */
+    private val publishAttempted = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
     /** Rendering only on change keeps the window idle, so nothing flickers. */
     private var rendered: List<PocketClient.Job>? = null
 
@@ -97,32 +100,26 @@ class MainActivity : Activity() {
                 return@execute
             }
             PocketClient.list()
-                .filter { it.status == "done" }
+                .filter { it.status == "done" && it.id !in publishAttempted }
                 .forEach { job ->
-                    val isCard = job.raw?.optString("kind") == "card"
-                    val name = when {
-                        isCard -> cardName(job.raw!!, job.id)
-                        job.savedFile != null -> File(job.savedFile).name
-                        else -> return@forEach
-                    }
-                    if (!alreadyPublished(name)) {
-                        publishFinished(job)?.let { published ->
-                            Notifier.done(applicationContext, job, published)
-                        }
+                    publishAttempted.add(job.id)
+                    publishFinished(job)?.let { published ->
+                        Notifier.done(applicationContext, job, published)
                     }
                 }
         }
     }
 
     /** Our own inserts are visible to us, so this is enough to avoid duplicates. */
-    private fun alreadyPublished(name: String): Boolean = try {
+    /** Only a row with the same byte count counts as the same file. */
+    private fun alreadyPublished(name: String, expectedBytes: Long): Boolean = try {
         contentResolver.query(
             MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-            arrayOf(MediaStore.MediaColumns._ID),
+            arrayOf(MediaStore.MediaColumns.SIZE),
             "${MediaStore.MediaColumns.DISPLAY_NAME} = ?",
             arrayOf(name),
             null,
-        )?.use { it.count > 0 } ?: false
+        )?.use { cursor -> cursor.moveToFirst() && cursor.getLong(0) == expectedBytes } ?: false
     } catch (_: Exception) {
         false
     }
@@ -208,22 +205,19 @@ class MainActivity : Activity() {
     }
 
     /** A finished job is either a downloaded video or a card we draw ourselves. */
+    /** The file name, but only when this call published it — so a job that was
+     *  already in Downloads does not announce itself again. */
     private fun publishFinished(job: PocketClient.Job): String? {
         val raw = job.raw
         if (raw != null && raw.optString("kind") == "card") {
-            val name = cardName(raw, job.id)
-            return if (alreadyPublished(name)) name else publishCard(raw, job.id)
+            val target = File(filesDir, "pocket/cards/${cardName(raw, job.id)}")
+            val rendered = if (target.isFile) target else (CardRenderer.render(raw, target) ?: return null)
+            return if (publishIfNeeded(rendered, "image/png")) rendered.name else null
         }
-        val path = job.savedFile ?: return null
-        val name = File(path).name
-        return if (alreadyPublished(name)) name else publishToDownloads(path, "video/mp4")
+        val source = job.savedFile?.let(::File) ?: return null
+        return if (publishIfNeeded(source, "video/mp4")) source.name else null
     }
 
-    private fun publishCard(raw: org.json.JSONObject, id: String): String? {
-        val target = File(filesDir, "pocket/cards/${cardName(raw, id)}")
-        val rendered = CardRenderer.render(raw, target) ?: return null
-        return publishToDownloads(rendered.path, "image/png")
-    }
 
     /** Name a card the way a person would look for it. */
     private fun cardName(raw: org.json.JSONObject, id: String): String {
@@ -232,28 +226,66 @@ class MainActivity : Activity() {
     }
 
     /** MediaStore keeps the file visible in Files and Gallery, not buried in app data. */
-    private fun publishToDownloads(path: String, mime: String): String? {
+    /** Publish only if an identical copy is not already there. */
+    /** True only when this call actually copied the file into Downloads. */
+    private fun publishIfNeeded(source: File, mime: String): Boolean {
+        if (!source.isFile) return false
+        if (alreadyPublished(source.name, source.length())) return false
+        return publishToDownloads(source.path, mime)
+    }
+
+    private fun publishToDownloads(path: String, mime: String): Boolean {
         return try {
-        val source = File(path)
-        if (!source.isFile) return null
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, source.name)
-            put(MediaStore.MediaColumns.MIME_TYPE, mime)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/Pocket")
-        }
-        val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-        uri?.let {
-            contentResolver.openOutputStream(it)?.use { out -> source.inputStream().use { input -> input.copyTo(out) } }
-        }
-        source.name
+            val source = File(path)
+            if (!source.isFile) return false
+            val folder = "${Environment.DIRECTORY_DOWNLOADS}/Pocket"
+            val partial = "${source.name}.partial"
+
+            // Drop a leftover from a copy that was killed before it finished.
+            contentResolver.delete(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                "${MediaStore.MediaColumns.DISPLAY_NAME} = ?",
+                arrayOf(partial),
+            )
+
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, partial)
+                put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, folder)
+            }
+            val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: return false
+
+            var copied = 0L
+            contentResolver.openOutputStream(uri)?.use { out ->
+                source.inputStream().use { input -> copied = input.copyTo(out) }
+            }
+            if (copied != source.length()) {
+                contentResolver.delete(uri, null, null)
+                return false
+            }
+
+            // The finished name appears only once the copy is complete, so a kill
+            // here cannot leave a truncated file under a name later checks trust.
+            val rename = ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, source.name) }
+            contentResolver.update(uri, rename, null, null) > 0
         } catch (_: Exception) {
-            null
+            false
         }
     }
 
     private fun refresh() {
         io.execute {
             val current = PocketClient.list()
+            // A job that finishes while the screen is up is published now, not
+            // deferred until the app is next opened.
+            val fresh = current.filter { it.status == "done" && it.id !in publishAttempted }
+            fresh.forEach { publishAttempted.add(it.id) }
+            fresh.forEach { job ->
+                publishFinished(job)?.let { published ->
+                    Notifier.done(applicationContext, job, published)
+                }
+            }
             runOnUiThread { render(current) }
         }
     }
