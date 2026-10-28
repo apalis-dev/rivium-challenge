@@ -9,21 +9,48 @@ import java.net.URL
 object PocketClient {
     private const val BASE = "http://127.0.0.1:8787"
 
+    data class Outcome(
+        val chars: Int,
+        val words: Int,
+        val uniqueWords: Int,
+        val hash: String,
+        val elapsedMs: Long,
+    ) {
+        val summary: String get() = "$words words · $uniqueWords unique · ${hash.take(8)}"
+    }
+
     data class Job(
         val id: String,
         val text: String,
         val status: String,
         val attempts: Int,
-        val summary: String?,
-    )
+        val enqueuedAt: Long,
+        val doneAt: Long?,
+        val outcome: Outcome?,
+        val error: String?,
+    ) {
+        /** A retry is the product working, so it belongs on screen. */
+        val recovered: Boolean get() = attempts > 1
+
+        val statusLine: String
+            get() = buildString {
+                append(status)
+                if (recovered) append(" · recovered · attempt $attempts")
+            }
+
+        val detail: String get() = error ?: outcome?.summary.orEmpty()
+    }
 
     /**
      * A share can arrive before the host has finished starting, so the first
      * attempts may be refused. Retrying is the whole cold-start story.
      */
-    fun submit(text: String, attempts: Int = 40): String? {
-        val body = JSONObject().put("text", text).toString()
-        repeat(attempts) { attempt ->
+    fun submit(text: String, workMs: Long? = null, attempts: Int = 40): String? {
+        val body = JSONObject().put("text", text).apply {
+            if (workMs != null) put("work_ms", workMs)
+        }.toString()
+
+        repeat(attempts) {
             val id = try {
                 post("$BASE/jobs", body)
             } catch (_: Exception) {
@@ -88,15 +115,24 @@ object PocketClient {
 
     private fun parse(json: JSONObject): Job {
         val result = json.optJSONObject("result")
-        val summary = result?.let {
-            "${it.getInt("words")} words · ${it.getString("hash").take(8)}"
+        val outcome = result?.takeIf { it.has("hash") }?.let {
+            Outcome(
+                chars = it.optInt("chars"),
+                words = it.optInt("words"),
+                uniqueWords = it.optInt("unique_words"),
+                hash = it.optString("hash"),
+                elapsedMs = it.optLong("elapsed_ms"),
+            )
         }
         return Job(
             id = json.getString("id"),
             text = json.getString("text"),
             status = json.getString("status"),
             attempts = json.getInt("attempts"),
-            summary = summary,
+            enqueuedAt = json.optLong("enqueued_at"),
+            doneAt = json.optLong("done_at").takeIf { it > 0 },
+            outcome = outcome,
+            error = result?.optString("error")?.takeIf { it.isNotBlank() },
         )
     }
 }
