@@ -208,14 +208,6 @@ foreground throughout. A copy is only recorded once its byte count matches the s
 mid-copy cannot leave a truncated file behind under a name that later checks would
 trust.
 
-[`docs/pocket-story.mp4`](docs/pocket-story.mp4) is a recording on the phone: the X app open
-on a post with a video, **Share → Share via… → Pocket**, *Download the video*, the app
-force-stopped mid-transfer, and after reopening the same post back as
-`running · recovered · attempt 2` under a summary reading "1 working". There is one cut, at
-the very end: the transfer was still running when the take stopped, so the last seconds are
-a short second clip of the system Files view of Downloads/Pocket, where the finished
-F1 file is listed at 88.43 MB.
-
 ![the story](docs/pocket-story.gif)
 
 The app has three views behind a bottom bar:
