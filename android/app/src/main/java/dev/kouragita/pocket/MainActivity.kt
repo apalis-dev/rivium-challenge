@@ -251,7 +251,7 @@ class MainActivity : Activity() {
     }
 
     /** The queue takes the text from a share, then reports back through a notification. */
-    private fun submit(text: String, workMs: Long? = null, action: String? = null) {
+    private fun submit(text: String, action: String? = null) {
         // Whatever you just asked for is what you want to watch.
         runOnUiThread {
             if (selectedTab != 2) {
@@ -262,12 +262,11 @@ class MainActivity : Activity() {
             }
         }
         io.execute {
-            val id = PocketClient.submit(text, workMs, action) ?: return@execute
-            // Keep going if the user leaves the app.
+            PocketClient.submit(text, action = action)
+            // The service carries the transfer and publishes it when it lands.
+            // Waiting for the job here blocked this same executor, which is what
+            // froze the list for the whole download.
             WorkerService.start(applicationContext)
-            val job = PocketClient.awaitDone(id, timeoutMs = 180_000) ?: return@execute
-            val published = publishFinished(job)
-            Notifier.done(applicationContext, job, published)
             refresh()
         }
     }
@@ -307,6 +306,10 @@ class MainActivity : Activity() {
     /** True only when this call actually copied the file into Downloads. */
 
 
+    /** The post a link points at, or the text itself when it is not a link. */
+    private fun postKey(text: String): String =
+        Regex("/status/(\\d+)").find(text)?.groupValues?.get(1) ?: text
+
     private fun refresh() {
         io.execute {
             val current = PocketClient.list()
@@ -343,10 +346,11 @@ class MainActivity : Activity() {
         }
 
         jobs.removeAllViews()
-        // One row per post: repeated shares of the same link are history, not library.
+        // One row per post. The same link arrives with different query strings, so
+        // compare the status id rather than the whole URL.
         val saved = current
             .filter { it.savedFile != null || it.raw?.optString("kind") == "card" }
-            .distinctBy { it.text }
+            .distinctBy { postKey(it.text) }
 
         when (selectedTab) {
             // Library: what you kept, filed by topic.
@@ -368,7 +372,9 @@ class MainActivity : Activity() {
                     jobs.addView(empty("No files yet. Videos and cards you save land in Downloads/Pocket and show up here."))
                 }
                 jobs.addView(heading("Saved files", saved.size))
-                saved.reversed().forEach { jobs.addView(row(it)) }
+                // Newest first: the list arrives newest-first, so reversing put the
+                // file you just saved at the bottom.
+                saved.forEach { jobs.addView(row(it)) }
             }
             // Queue: everything, including what is still running or failed.
             else -> {

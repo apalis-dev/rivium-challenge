@@ -53,11 +53,12 @@ A finished text job arrives as a notification carrying **Copy hash** and **Share
 ![notification](docs/pocket-notification.png)
 
 [`docs/pocket-story.mp4`](docs/pocket-story.mp4) is the recorded flow on the phone: the
-F1 post open in the X app, Share, Share via…, Pocket, **Download the video**, the row coming
-back after a mid-transfer kill as `running · recovered · attempt 2` under a summary reading
-"1 working", and finally the finished 84 MB file in Downloads. One honest cut: the transfer
-was still running when the take ended, so the last few seconds are a second clip of the
-completed file rather than the same continuous shot.
+F1 post open in the X app, Share, Share via…, Pocket, **Download the video**, the queue
+showing that job as `running` straight away, the process force-stopped mid-transfer, and
+after reopening the same post as `running · recovered · attempt 2` until it finishes and the
+summary reads "40 done", with the finished file at the top of Downloads. One cut, at the very
+end: the last seconds were recorded immediately after the take, because the transfer finished
+just as the recording stopped.
 
 ## How it works
 
