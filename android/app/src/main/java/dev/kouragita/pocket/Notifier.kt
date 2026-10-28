@@ -15,6 +15,7 @@ object Notifier {
     const val ACTION_SHARE = "dev.kouragita.pocket.SHARE_RESULT"
     const val EXTRA_TITLE = "title"
     const val EXTRA_BODY = "body"
+    const val EXTRA_HASH = "hash"
 
     fun done(context: Context, job: PocketClient.Job) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
@@ -25,19 +26,30 @@ object Notifier {
         val failed = job.status == "failed"
         val title = (if (failed) "Job failed" else "Job done") + " · " + job.text.take(30)
         val body = job.outcome?.summary ?: job.error ?: job.status
+        val hash = job.outcome?.hash.orEmpty()
         val code = job.id.hashCode()
 
-        val notification = Notification.Builder(context, CHANNEL)
+        val builder = Notification.Builder(context, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)
             .setContentIntent(open(context, code))
-            .addAction(0, "Copy result", action(context, code * 31 + 1, ACTION_COPY, title, body))
-            .addAction(0, "Share result", action(context, code * 31 + 2, ACTION_SHARE, title, body))
-            .build()
+            .addAction(
+                0,
+                "Share result",
+                action(context, code * 31 + 2, ACTION_SHARE, title, body, hash),
+            )
 
-        manager.notify(code, notification)
+        if (hash.isNotEmpty()) {
+            builder.addAction(
+                0,
+                "Copy hash",
+                action(context, code * 31 + 1, ACTION_COPY, title, body, hash),
+            )
+        }
+
+        manager.notify(code, builder.build())
     }
 
     private fun open(context: Context, code: Int): PendingIntent {
@@ -57,11 +69,13 @@ object Notifier {
         action: String,
         title: String,
         body: String,
+        hash: String,
     ): PendingIntent {
         val intent = Intent(context, ResultActions::class.java).apply {
             this.action = action
             putExtra(EXTRA_TITLE, title)
             putExtra(EXTRA_BODY, body)
+            putExtra(EXTRA_HASH, hash)
         }
         return PendingIntent.getBroadcast(
             context,
