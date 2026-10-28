@@ -7,6 +7,7 @@ import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Environment
+import android.view.Gravity
 import android.provider.MediaStore
 import java.io.File
 import android.graphics.BitmapFactory
@@ -28,11 +29,11 @@ import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private lateinit var status: TextView
+    private lateinit var title: TextView
     private lateinit var summary: TextView
     private lateinit var hint: TextView
     private lateinit var jobs: LinearLayout
     private lateinit var tabs: LinearLayout
-    private lateinit var samples: LinearLayout
 
     /** One worker thread serialises HTTP calls, so polls can never overlap. */
     private val io = Executors.newSingleThreadExecutor { runnable ->
@@ -48,6 +49,11 @@ class MainActivity : Activity() {
             handler.postDelayed(this, 700)
         }
     }
+
+    private val accent = 0xFF5B9DFF.toInt()
+    private val dim = 0xFF8B949E.toInt()
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     /** Which tab is showing: 0 library, 1 downloads, 2 queue. */
     private var selectedTab = 0
@@ -68,9 +74,12 @@ class MainActivity : Activity() {
 
         Host.start(this) { result ->
             runOnUiThread {
-                status.text = when (result) {
-                    is Host.Result.Ready -> result.version
-                    is Host.Result.Failed -> "host failed (${result.code}): ${result.message}"
+                when (result) {
+                    is Host.Result.Ready -> status.visibility = View.GONE
+                    is Host.Result.Failed -> {
+                        status.text = "Host failed (${result.code}): ${result.message}"
+                        status.visibility = View.VISIBLE
+                    }
                 }
                 refresh()
                 // The listener is up now, so reconciliation can actually read.
@@ -141,52 +150,67 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun buildUi(): ScrollView {
-        status = TextView(this).apply { text = "starting…"; textSize = 14f }
-        summary = TextView(this).apply { textSize = 18f; setPadding(0, 8, 0, 4) }
+    private fun buildUi(): View {
+        // Only surfaces a problem; a healthy host shows nothing here.
+        status = TextView(this).apply {
+            textSize = 12f
+            alpha = 0.7f
+            visibility = View.GONE
+            setPadding(0, 8, 0, 0)
+        }
+        title = TextView(this).apply {
+            text = "Pocket"
+            textSize = 26f
+            paint.isFakeBoldText = true
+            setPadding(0, 8, 0, 2)
+        }
+        summary = TextView(this).apply { textSize = 16f; alpha = 0.7f; setPadding(0, 2, 0, 2) }
         hint = TextView(this).apply {
-            text = "Share text from any app to add a job. Long-press or select text, " +
-                "tap Share, then pick Pocket."
-            textSize = 14f
-            setPadding(0, 8, 0, 16)
+            text = "Share a post from X and pick Download the video or Save a card. " +
+                "Everything you keep lands in Downloads/Pocket."
+            textSize = 13f
+            alpha = 0.65f
+            setPadding(0, 4, 0, 20)
         }
         jobs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         tabs = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 12, 0, 4)
+            setPadding(0, 8, 0, 20)
+            background = GradientDrawable().apply { setColor(0x14FFFFFF) }
         }
         refreshTabs()
-        samples.visibility = LinearLayout.GONE
-
-        samples = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 8, 0, 16)
-            addView(
-                Button(this@MainActivity).apply {
-                    text = "Try a sample"
-                    setOnClickListener { submit("The quick brown fox jumps over the lazy dog") }
-                },
-            )
-            addView(
-                Button(this@MainActivity).apply {
-                    text = "Slow job (6s)"
-                    setOnClickListener { submit("A slow job, to watch recovery", workMs = 6_000) }
-                },
-            )
-        }
 
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 96, 48, 48)
+            setPadding(48, 72, 48, 32)
             addView(status)
+            addView(title)
             addView(summary)
-            addView(tabs)
             addView(hint)
-            addView(samples)
             addView(jobs)
         }
-        return ScrollView(this).apply { addView(column) }
+        val scrolling = ScrollView(this).apply {
+            addView(column)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f,
+            )
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(scrolling)
+            addView(tabs)
+            // The window is edge-to-edge, so keep clear of the status and gesture bars.
+            setOnApplyWindowInsetsListener { view, insets ->
+                val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
+                view.setPadding(0, bars.top, 0, bars.bottom)
+                insets
+            }
+        }
     }
+
+    /** Icon over label, equal widths, the selected one carried by the accent. */
 
     /** A link can be archived; plain text can only be described. */
     private fun offerActions(text: String) {
@@ -321,12 +345,7 @@ class MainActivity : Activity() {
                 parts.joinToString(" · ")
             }
         }
-        hint.visibility = if (current.isEmpty()) LinearLayout.VISIBLE else LinearLayout.GONE
-
-        // The sample buttons are a testing affordance; they belong to the queue view.
-        if (::samples.isInitialized) {
-            samples.visibility = if (selectedTab == 2) LinearLayout.VISIBLE else LinearLayout.GONE
-        }
+        hint.visibility = if (selectedTab == 2 && current.isNotEmpty()) LinearLayout.GONE else LinearLayout.VISIBLE
 
         jobs.removeAllViews()
         val saved = current.filter { it.savedFile != null || it.raw?.optString("kind") == "card" }
@@ -335,7 +354,7 @@ class MainActivity : Activity() {
             // Library: what you kept, filed by topic.
             0 -> {
                 if (saved.isEmpty()) {
-                    jobs.addView(empty("Nothing saved yet. Share a post and pick Download or Save a card."))
+                    jobs.addView(empty("Nothing saved yet. Share a post from X and choose Download the video or Save a card."))
                 }
                 val groups = saved.groupBy { it.topics.firstOrNull() ?: "Unsorted" }
                 groups.keys
@@ -348,14 +367,14 @@ class MainActivity : Activity() {
             // Downloads: the files themselves, newest first.
             1 -> {
                 if (saved.isEmpty()) {
-                    jobs.addView(empty("No files yet. Saved videos and cards appear in Downloads/Pocket."))
+                    jobs.addView(empty("No files yet. Videos and cards you save land in Downloads/Pocket and show up here."))
                 }
                 jobs.addView(heading("Saved files", saved.size))
                 saved.reversed().forEach { jobs.addView(row(it)) }
             }
             // Queue: everything, including what is still running or failed.
             else -> {
-                if (current.isEmpty()) jobs.addView(empty("Nothing queued yet."))
+                if (current.isEmpty()) jobs.addView(empty("Nothing queued. Share a link from X to add your first job."))
                 current.forEach { jobs.addView(row(it)) }
             }
         }
@@ -375,25 +394,49 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Icon over label, equal widths, the selected one carried by the accent. */
     private fun refreshTabs() {
         tabs.removeAllViews()
-        listOf("Library", "Downloads", "Queue").forEachIndexed { index, label ->
+        listOf(
+            Triple("Library", R.drawable.ic_tab_library, 0),
+            Triple("Downloads", R.drawable.ic_tab_download, 1),
+            Triple("Queue", R.drawable.ic_tab_queue, 2),
+        ).forEach { (label, icon, index) ->
+            val tint = if (selectedTab == index) accent else dim
             tabs.addView(
-                TextView(this).apply {
-                    text = label
-                    textSize = 16f
-                    setPadding(0, 10, 56, 10)
-                    alpha = if (selectedTab == index) 1f else 0.45f
-                    paint.isFakeBoldText = selectedTab == index
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1f,
+                    )
+                    setPadding(0, 12, 0, 10)
+                    isClickable = true
                     setOnClickListener {
                         if (selectedTab != index) {
                             selectedTab = index
                             refreshTabs()
-                            samples.visibility = if (index == 2) LinearLayout.VISIBLE else LinearLayout.GONE
                             rendered = emptyList()
                             render(lastJobs)
                         }
                     }
+                    addView(
+                        ImageView(this@MainActivity).apply {
+                            setImageResource(icon)
+                            setColorFilter(tint)
+                            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+                        },
+                    )
+                    addView(
+                        TextView(this@MainActivity).apply {
+                            text = label
+                            textSize = 11f
+                            setTextColor(tint)
+                            setPadding(0, 4, 0, 0)
+                        },
+                    )
                 },
             )
         }

@@ -194,6 +194,15 @@ foreground throughout. A copy is only recorded once its byte count matches the s
 mid-copy cannot leave a truncated file behind under a name that later checks would
 trust.
 
+The app has three views behind a bottom bar:
+
+| Library | Downloads | Queue |
+| --- | --- | --- |
+| ![library](docs/tab-library.png) | ![downloads](docs/tab-downloads.png) | ![queue](docs/tab-queue.png) |
+
+Library files what you kept under its topic, Downloads lists the files with their sizes,
+and Queue keeps the live states, including the ones that were interrupted and resumed.
+
 Saved posts keep their thumbnail, so the list leads with the image and the topic:
 
 ![the library, grouped by topic](docs/pocket-library.png)
