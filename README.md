@@ -184,6 +184,12 @@ request, so a dropped connection costs what was missed rather than the whole fil
 Verified by killing the app mid-transfer — 3.5 MB on disk, relaunched, finished at
 exactly 11,493,459 bytes on attempt 2.
 
+Choosing a format is the last thing you have to do. A foreground service keeps the
+transfer and the publishing going after you leave the app, so you can go back to
+scrolling or share another link while Pocket works. Verified with the app sent to the
+background: the launcher was foreground, the service was alive, and the finished file
+appeared in Downloads/Pocket on its own.
+
 Publishing follows the job, not the lifecycle. A transfer that finishes while the
 screen is open is copied to `Downloads/Pocket` immediately and announces itself; one
 that finishes while the app is closed is published on the next launch. Verified with a
