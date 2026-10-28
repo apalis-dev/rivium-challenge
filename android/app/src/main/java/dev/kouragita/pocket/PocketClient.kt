@@ -54,12 +54,10 @@ object PocketClient {
      */
     fun submit(
         text: String,
-        workMs: Long? = null,
         action: String? = null,
         attempts: Int = 40,
     ): String? {
         val body = JSONObject().put("text", text).apply {
-            if (workMs != null) put("work_ms", workMs)
             if (action != null) put("action", action)
         }.toString()
 
@@ -71,16 +69,6 @@ object PocketClient {
             }
             if (id != null) return id
             Thread.sleep(200)
-        }
-        return null
-    }
-
-    fun awaitDone(id: String, timeoutMs: Long = 30_000): Job? {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            val job = get("$BASE/jobs/$id") ?: return null
-            if (job.status == "done" || job.status == "failed") return job
-            Thread.sleep(300)
         }
         return null
     }

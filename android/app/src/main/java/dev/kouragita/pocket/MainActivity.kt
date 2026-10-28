@@ -107,7 +107,7 @@ class MainActivity : Activity() {
                     Thread.sleep(250)
                     waited++
                 }
-                PocketClient.submit(link, null, action)
+                PocketClient.submit(link, action = action)
             }.start()
         }
     }
@@ -370,8 +370,9 @@ class MainActivity : Activity() {
             1 -> {
                 if (saved.isEmpty()) {
                     jobs.addView(empty("No files yet. Videos and cards you save land in Downloads/Pocket and show up here."))
+                } else {
+                    jobs.addView(heading("Saved files", saved.size))
                 }
-                jobs.addView(heading("Saved files", saved.size))
                 // Newest first: the list arrives newest-first, so reversing put the
                 // file you just saved at the bottom.
                 saved.forEach { jobs.addView(row(it)) }
