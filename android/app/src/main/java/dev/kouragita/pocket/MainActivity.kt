@@ -69,6 +69,7 @@ class MainActivity : Activity() {
         // The app draws its own header; the platform title bar would cover it.
         requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         setContentView(buildUi())
+        io.execute { Publisher.sweepPartials(applicationContext) }
         askForNotifications()
 
         Host.start(this) { result ->
@@ -272,6 +273,25 @@ class MainActivity : Activity() {
     }
 
     /** A finished job is either a downloaded video or a card we draw ourselves. */
+    /** Long-pressing a saved row offers to remove its file. */
+    private fun confirmDelete(job: PocketClient.Job) {
+        if (job.savedFile == null && job.raw?.optString("kind") != "card") return
+        AlertDialog.Builder(this)
+            .setTitle("Delete this file?")
+            .setMessage("It will be removed from Downloads/Pocket. The job stays in the list.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Delete") { _, _ ->
+                io.execute {
+                    Publisher.delete(applicationContext, job)
+                    runOnUiThread {
+                        rendered = emptyList()
+                        refresh()
+                    }
+                }
+            }
+            .show()
+    }
+
     /** The file name, but only when this call published it — so a job that was
      *  already in Downloads does not announce itself again. */
     private fun publishFinished(job: PocketClient.Job): String? =
@@ -323,7 +343,10 @@ class MainActivity : Activity() {
         }
 
         jobs.removeAllViews()
-        val saved = current.filter { it.savedFile != null || it.raw?.optString("kind") == "card" }
+        // One row per post: repeated shares of the same link are history, not library.
+        val saved = current
+            .filter { it.savedFile != null || it.raw?.optString("kind") == "card" }
+            .distinctBy { it.text }
 
         when (selectedTab) {
             // Library: what you kept, filed by topic.
@@ -450,6 +473,7 @@ class MainActivity : Activity() {
             ).apply { bottomMargin = 16 }
             isClickable = true
             setOnClickListener { showDetail(job) }
+            setOnLongClickListener { confirmDelete(job); true }
         }
 
         val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -557,11 +581,15 @@ class MainActivity : Activity() {
             }
         }
 
-        AlertDialog.Builder(this)
+        val detail = AlertDialog.Builder(this)
             .setTitle("Job ${job.id.takeLast(6)}")
             .setMessage(message)
             .setPositiveButton("Close", null)
-            .show()
+        // Only offer the file action when there is a file to remove.
+        if (job.savedFile != null || job.raw?.optString("kind") == "card") {
+            detail.setNeutralButton("Delete file") { _, _ -> confirmDelete(job) }
+        }
+        detail.show()
     }
 
     private fun sharedText(intent: Intent?): String? {

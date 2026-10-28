@@ -61,6 +61,57 @@ object Publisher {
      * after a write, and the query fails quietly under scoped storage, so every
      * poll concluded the file was missing and copied it again.
      */
+    /** Removes a saved file from Downloads/Pocket and from our own storage. */
+    fun delete(context: Context, job: PocketClient.Job): Boolean = synchronized(lock) {
+        val raw = job.raw
+        val published = if (raw != null && raw.optString("kind") == "card") {
+            cardName(raw, job.id)
+        } else {
+            job.savedFile?.let { File(it).name }
+        }
+
+        var removed = false
+        if (published != null) {
+            removed = context.contentResolver.delete(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND " +
+                    "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+                arrayOf(published, "%Download/Pocket%"),
+            ) > 0
+            record(context).edit()
+                .putStringSet("names", publishedNames(context) - published)
+                .apply()
+        }
+
+        // The copy this app kept, plus the card it would redraw from.
+        job.savedFile?.let { path -> File(path).delete() }
+        raw?.optString("thumb")?.takeIf { it.isNotEmpty() }?.let { File(it).delete() }
+        raw?.optString("avatar")?.takeIf { it.isNotEmpty() }?.let { File(it).delete() }
+        if (raw != null && raw.optString("kind") == "card") {
+            File(context.filesDir, "pocket/cards/${cardName(raw, job.id)}").delete()
+        }
+        removed
+    }
+
+    /**
+     * Rows left behind by a copy that was killed before it was renamed. Without
+     * this they sit in Files forever as zero-byte files nobody can open.
+     */
+    fun sweepPartials(context: Context) {
+        synchronized(lock) {
+            try {
+                context.contentResolver.delete(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? AND " +
+                        "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+                    arrayOf("%.partial%", "%Download/Pocket%"),
+                )
+            } catch (_: Exception) {
+                // Nothing to clean, or the provider is busy.
+            }
+        }
+    }
+
     fun alreadyPublished(context: Context, name: String): Boolean =
         synchronized(lock) { name in publishedNames(context) }
 

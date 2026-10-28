@@ -21,8 +21,9 @@ Share → Pocket  →  POST 127.0.0.1:8787/jobs  →  SQLite  →  worker  →  
 The job is written to disk **before** any work starts, so closing the app, or the
 system killing it, loses nothing. Reopen and the work finishes.
 
-One job type: count the characters and words, find the distinct words, and take an
-FNV-1a hash so the same text always gives the same fingerprint.
+The job describes text — characters, words, distinct words and an FNV-1a hash so the same
+text always gives the same fingerprint — or, when the shared text is a post link, it saves
+that post as a video or as a card. One worker and one queue serve all three.
 
 Four states, all captured on the phone. Empty, and working:
 
@@ -206,10 +207,13 @@ foreground throughout. A copy is only recorded once its byte count matches the s
 mid-copy cannot leave a truncated file behind under a name that later checks would
 trust.
 
-[`docs/pocket-story.mp4`](docs/pocket-story.mp4) is one continuous recording on the phone:
-the X app open on a post with a video, **Share → Share via… → Pocket**, *Download the
-video*, the job appearing in Queue, the app force-stopped mid-transfer, reopened, and the
-same post coming back as `done · recovered · attempt 2` with the 11 MB file in Downloads.
+[`docs/pocket-story.mp4`](docs/pocket-story.mp4) is a recording on the phone: the X app open
+on a post with a video, **Share → Share via… → Pocket**, *Download the video*, the app
+force-stopped mid-transfer, and after reopening the same post back as
+`running · recovered · attempt 2` under a summary reading "1 working". There is one cut, at
+the very end: the transfer was still running when the take stopped, so the last seconds are
+a short second clip of the system Files view of Downloads/Pocket, where the finished
+F1 file is listed at 88.43 MB.
 
 ![the story](docs/pocket-story.gif)
 
@@ -240,10 +244,10 @@ says so rather than guessing with a model.
 
 Three deliberate limits:
 
-- **No foreground service.** The system may kill a transfer (it did, via SIGKILL). That
-  used to lose the file; now it costs a restart of the transfer, and the job is re-queued
-  automatically. A persistent notification and an Android 14 service type buy nothing a
-  resume does not already give, so the process is allowed to die.
+- **A foreground service, but only while work is queued.** It keeps a transfer and its
+  publishing alive when you leave the app, which is what lets you share a link and carry on
+  scrolling. The process can still be killed — it was, by the low-memory killer — and
+  because transfers resume from disk the cost is the bytes missed, not the whole file.
 - **MP3 is desktop only.** The phone has no ffmpeg, and bundling one per ABI is ~20 MB for
   a feature the desktop CLI already does. `x-archive --audio` covers it.
 - **Public posts only.** Protected, deleted or limited posts return a tombstone and are
@@ -365,13 +369,14 @@ Pinned exactly; `Cargo.lock` is committed.
   choice made here.
 - The listener is **loopback only** and unauthenticated; it is not reachable from
   another device.
-- No foreground service: the app is allowed to die, which is exactly the behaviour the
-  persistence story depends on.
+- The service is foreground while work is queued, so an ongoing notification is visible
+  during a transfer. If the process is killed anyway, the job resumes and finishes.
 - The notification carries **Copy hash** and **Share result**. Copy hash was tapped on the
   phone and the receiver logged `copied hash f3f9b7f5e7e47110` — the full sixteen
   characters. Share result is attached and visible in the notification, but its tap was
   not captured.
-- One job type, by design.
+- Three actions, one worker: describe text, save a video, save a card. The queue, the retry
+  policy and the read model are shared, so durability is not implemented three times.
 
 ## Layout
 
