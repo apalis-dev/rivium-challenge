@@ -175,8 +175,8 @@ class MainActivity : Activity() {
         jobs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         tabs = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 8, 0, 20)
-            background = GradientDrawable().apply { setColor(0x14FFFFFF) }
+            setPadding(0, 10, 0, 14)
+            background = GradientDrawable().apply { setColor(0xFF15181B.toInt()) }
         }
         refreshTabs()
 
@@ -200,6 +200,13 @@ class MainActivity : Activity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(scrolling)
+            addView(android.view.View(this@MainActivity).apply {
+                setBackgroundColor(0xFF23282D.toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(1),
+                )
+            })
             addView(tabs)
             // The window is edge-to-edge, so keep clear of the status and gesture bars.
             setOnApplyWindowInsetsListener { view, insets ->
@@ -232,6 +239,15 @@ class MainActivity : Activity() {
 
     /** The queue takes the text from a share, then reports back through a notification. */
     private fun submit(text: String, workMs: Long? = null, action: String? = null) {
+        // Whatever you just asked for is what you want to watch.
+        runOnUiThread {
+            if (selectedTab != 2) {
+                selectedTab = 2
+                refreshTabs()
+                rendered = emptyList()
+                render(lastJobs)
+            }
+        }
         io.execute {
             val id = PocketClient.submit(text, workMs, action) ?: return@execute
             val job = PocketClient.awaitDone(id, timeoutMs = 180_000) ?: return@execute
@@ -412,7 +428,8 @@ class MainActivity : Activity() {
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         1f,
                     )
-                    setPadding(0, 12, 0, 10)
+                    setPadding(0, 10, 0, 6)
+                    minimumHeight = dp(56)
                     isClickable = true
                     setOnClickListener {
                         if (selectedTab != index) {
@@ -426,15 +443,17 @@ class MainActivity : Activity() {
                         ImageView(this@MainActivity).apply {
                             setImageResource(icon)
                             setColorFilter(tint)
-                            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+                            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
                         },
                     )
                     addView(
                         TextView(this@MainActivity).apply {
                             text = label
-                            textSize = 11f
+                            textSize = 12f
                             setTextColor(tint)
-                            setPadding(0, 4, 0, 0)
+                            setPadding(0, 6, 0, 0)
+                            maxLines = 1
+                            gravity = Gravity.CENTER
                         },
                     )
                 },

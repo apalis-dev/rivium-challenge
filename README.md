@@ -194,6 +194,13 @@ foreground throughout. A copy is only recorded once its byte count matches the s
 mid-copy cannot leave a truncated file behind under a name that later checks would
 trust.
 
+[`docs/pocket-story.mp4`](docs/pocket-story.mp4) is one continuous recording on the phone:
+the X app open on a post with a video, **Share → Share via… → Pocket**, *Download the
+video*, the job appearing in Queue, the app force-stopped mid-transfer, reopened, and the
+same post coming back as `done · recovered · attempt 2` with the 11 MB file in Downloads.
+
+![the story](docs/pocket-story.gif)
+
 The app has three views behind a bottom bar:
 
 | Library | Downloads | Queue |
