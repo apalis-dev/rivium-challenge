@@ -11,6 +11,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.TypefaceSpan
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -43,6 +46,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The app draws its own header; the platform title bar would cover it.
+        requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         setContentView(buildUi())
         askForNotifications()
 
@@ -178,16 +183,7 @@ class MainActivity : Activity() {
             setOnClickListener { showDetail(job) }
         }
 
-        card.addView(TextView(this).apply {
-            text = job.statusLine
-            textSize = 12f
-            letterSpacing = 0.06f
-            if (job.status == "failed") {
-                setTextColor(0xFFD9534F.toInt())
-            } else {
-                alpha = 0.7f
-            }
-        })
+        card.addView(chip(job))
         card.addView(TextView(this).apply {
             text = job.text.take(120)
             textSize = 15f
@@ -204,12 +200,40 @@ class MainActivity : Activity() {
     }
 
 
+    /** A tinted pill, so done, running, recovered and failed differ at a glance. */
+    private fun chip(job: PocketClient.Job): TextView {
+        val tone = when {
+            job.status == "failed" -> 0xFFD9534F
+            job.recovered -> 0xFFE0A030
+            job.status == "running" -> 0xFF4A90D9
+            job.status == "pending" -> 0xFF9E9E9E
+            else -> 0xFF4CAF50
+        }.toInt()
+
+        return TextView(this).apply {
+            text = job.statusLine
+            textSize = 11f
+            letterSpacing = 0.08f
+            setTextColor(tone)
+            setPadding(30, 10, 30, 10)
+            background = GradientDrawable().apply {
+                cornerRadius = 999f
+                setColor((tone and 0x00FFFFFF) or 0x26000000)
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+        }
+    }
+
     private fun showDetail(job: PocketClient.Job) {
         val outcome = job.outcome
         val body = buildString {
             append(job.text)
             append("\n\n")
             append("status      ${job.statusLine}\n")
+            append("attempts    ${job.attempts}\n")
             if (outcome != null) {
                 append("characters  ${outcome.chars}\n")
                 append("words       ${outcome.words}\n")
@@ -221,9 +245,22 @@ class MainActivity : Activity() {
             append("queued      ${job.enqueuedAt}\n")
             job.doneAt?.let { append("finished    $it\n") }
         }
+        val message = SpannableString(body)
+        job.outcome?.hash?.let { hash ->
+            val start = body.indexOf(hash)
+            if (start >= 0) {
+                message.setSpan(
+                    TypefaceSpan("monospace"),
+                    start,
+                    start + hash.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            }
+        }
+
         AlertDialog.Builder(this)
             .setTitle("Job ${job.id.takeLast(6)}")
-            .setMessage(body)
+            .setMessage(message)
             .setPositiveButton("Close", null)
             .show()
     }
