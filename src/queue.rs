@@ -61,10 +61,15 @@ pub async fn enqueue(pool: &SqlitePool, job: Job) -> Result<(), rivium::Error> {
         .max_attempts(5)
         .build();
 
-    storage(pool)
-        .push_task(task)
-        .await
-        .map_err(|error| internal(error.to_string()))?;
+    if let Err(error) = storage(pool).push_task(task).await {
+        // A view row with no task behind it would claim work that will never
+        // run, so remove it before reporting the failure.
+        let _ = sqlx::query("DELETE FROM job_view WHERE id = ?1")
+            .bind(&job.id)
+            .execute(pool)
+            .await;
+        return Err(internal(error.to_string()));
+    }
 
     Ok(())
 }

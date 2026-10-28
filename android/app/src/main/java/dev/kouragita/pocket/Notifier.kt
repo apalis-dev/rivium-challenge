@@ -9,7 +9,7 @@ import android.content.Intent
 
 /** Shows the result of a job, with actions so it is not a dead end. */
 object Notifier {
-    private const val CHANNEL = "jobs"
+    private const val CHANNEL = "job-results"
 
     const val ACTION_COPY = "dev.kouragita.pocket.COPY_HASH"
     const val ACTION_SHARE = "dev.kouragita.pocket.SHARE_RESULT"
@@ -20,7 +20,7 @@ object Notifier {
     fun done(context: Context, job: PocketClient.Job) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Jobs", NotificationManager.IMPORTANCE_DEFAULT),
+            NotificationChannel(CHANNEL, "Job results", NotificationManager.IMPORTANCE_HIGH),
         )
 
         val failed = job.status == "failed"
