@@ -35,12 +35,12 @@ A finished text job arrives as a notification carrying **Copy hash** and **Share
 saved post announces where the file went and offers **Share result**, as the recording below
 shows.
 
-[`docs/pocket-story.mp4`](docs/pocket-story.mp4) is one continuous recording on the phone, no
-cuts: the ESPN post open in the X app, Share, Share via…, Pocket, **Download the video**, Settings
-→ Pocket → **Force stop** while the transfer is running, reopening the app to find the same post as
-`running · recovered · attempt 2` under a summary reading "1 working", the completion notification
-"Saved 17.4 MB to Downloads/Pocket", and the file at the top of Downloads with the summary at
-"40 done".
+[`docs/pocket-story.mp4`](docs/pocket-story.mp4) is one continuous recording on the phone,
+with no cuts: the ESPN post open in the X app, Share, Share via…, Pocket, **Download the video**,
+the queue showing that job as `running` straight away, Settings → Pocket → **Force stop** while it
+is still transferring, reopening to find the same post as `running · recovered · attempt 2`, the
+completion notification "Saved 17.4 MB to Downloads/Pocket", and that file at the top of Downloads
+with the summary at "40 done".
 
 ## How it works
 
