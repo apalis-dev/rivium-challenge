@@ -31,7 +31,6 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var title: TextView
     private lateinit var summary: TextView
-    private lateinit var hint: TextView
     private lateinit var jobs: LinearLayout
     private lateinit var tabs: LinearLayout
 
@@ -177,13 +176,6 @@ class MainActivity : Activity() {
             setPadding(0, 8, 0, 2)
         }
         summary = TextView(this).apply { textSize = 16f; alpha = 0.7f; setPadding(0, 2, 0, 2) }
-        hint = TextView(this).apply {
-            text = "Share a post from X and pick Download the video or Save a card. " +
-                "Everything you keep lands in Downloads/Pocket."
-            textSize = 13f
-            alpha = 0.65f
-            setPadding(0, 4, 0, 20)
-        }
         jobs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         tabs = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -198,7 +190,6 @@ class MainActivity : Activity() {
             addView(status)
             addView(title)
             addView(summary)
-            addView(hint)
             addView(jobs)
         }
         val scrolling = ScrollView(this).apply {
@@ -330,7 +321,6 @@ class MainActivity : Activity() {
                 parts.joinToString(" · ")
             }
         }
-        hint.visibility = if (selectedTab == 2 && current.isNotEmpty()) LinearLayout.GONE else LinearLayout.VISIBLE
 
         jobs.removeAllViews()
         val saved = current.filter { it.savedFile != null || it.raw?.optString("kind") == "card" }

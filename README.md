@@ -51,11 +51,9 @@ A finished text job arrives as a notification carrying **Copy hash** and **Share
 
 ![notification](docs/pocket-notification.png)
 
-[`docs/share.gif`](docs/share.gif) is one continuous recording on the phone. In order: the
-app open, the system share sheet opened over another app with Pocket in it, the share
-arriving as a job, that result appearing as a heads-up notification, **Slow job (6s)**
-started, the process force-stopped while it was in flight, and after reopening the same job
-back at the top of the list as `done · recovered · attempt 2`.
+[`docs/pocket-story.mp4`](docs/pocket-story.mp4) is the recorded flow on the phone: a
+post shared from the X app, a format chosen, the job running, the app killed while it was
+in flight, and the same job recovered and published after reopening.
 
 ## How it works
 
@@ -160,9 +158,9 @@ Open the app once so the host starts, then share text from any other app. The fi
 share works too: it retries until the host is ready, because a share can launch the
 process before Rivium has finished starting.
 
-Two buttons in the app post to the same endpoint a share uses, so you can exercise
-everything without leaving the app or touching a terminal: **Try a sample**, and
-**Slow job (6s)** for watching recovery.
+Sharing is the only way work enters the app: select text anywhere, tap Share, pick
+Pocket. There are deliberately no in-app buttons for creating jobs, because the point
+is that another app starts the work.
 
 ```sh
 adb forward tcp:8787 tcp:8787  # optional: poke the phone's queue from the laptop
