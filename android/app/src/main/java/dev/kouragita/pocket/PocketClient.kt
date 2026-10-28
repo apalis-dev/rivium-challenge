@@ -28,6 +28,8 @@ object PocketClient {
         val doneAt: Long?,
         val outcome: Outcome?,
         val error: String?,
+        val savedFile: String?,
+        val savedBytes: Long?,
     ) {
         /** A retry is the product working, so it belongs on screen. */
         val recovered: Boolean get() = attempts > 1
@@ -45,9 +47,15 @@ object PocketClient {
      * A share can arrive before the host has finished starting, so the first
      * attempts may be refused. Retrying is the whole cold-start story.
      */
-    fun submit(text: String, workMs: Long? = null, attempts: Int = 40): String? {
+    fun submit(
+        text: String,
+        workMs: Long? = null,
+        action: String? = null,
+        attempts: Int = 40,
+    ): String? {
         val body = JSONObject().put("text", text).apply {
             if (workMs != null) put("work_ms", workMs)
+            if (action != null) put("action", action)
         }.toString()
 
         repeat(attempts) {
@@ -133,6 +141,8 @@ object PocketClient {
             doneAt = json.optLong("done_at").takeIf { it > 0 },
             outcome = outcome,
             error = result?.optString("error")?.takeIf { it.isNotBlank() },
+            savedFile = result?.optString("file")?.takeIf { it.isNotBlank() },
+            savedBytes = result?.optLong("bytes")?.takeIf { it > 0 },
         )
     }
 }

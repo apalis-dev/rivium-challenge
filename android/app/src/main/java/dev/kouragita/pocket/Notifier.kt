@@ -17,7 +17,7 @@ object Notifier {
     const val EXTRA_BODY = "body"
     const val EXTRA_HASH = "hash"
 
-    fun done(context: Context, job: PocketClient.Job) {
+    fun done(context: Context, job: PocketClient.Job, published: String? = null) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL, "Job results", NotificationManager.IMPORTANCE_HIGH),
@@ -25,7 +25,13 @@ object Notifier {
 
         val failed = job.status == "failed"
         val title = (if (failed) "Job failed" else "Job done") + " · " + job.text.take(30)
-        val body = job.outcome?.summary ?: job.error ?: job.status
+        val megabytes = job.savedBytes?.div(1_048_576.0)
+        val body = when {
+            job.savedFile != null && megabytes != null ->
+                "Saved ${"%.1f".format(megabytes)} MB to Downloads/Pocket" +
+                    if (published == null) " (app storage)" else ""
+            else -> job.outcome?.summary ?: job.error ?: job.status
+        }
         val hash = job.outcome?.hash.orEmpty()
         val code = job.id.hashCode()
 

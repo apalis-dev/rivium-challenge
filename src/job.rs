@@ -3,6 +3,7 @@
 use std::time::{Duration, Instant};
 
 use apalis::prelude::{BoxDynError, Data};
+use crate::media::{self, Downloads};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
@@ -14,6 +15,10 @@ pub struct Job {
     pub text: String,
     #[serde(default)]
     pub work_ms: Option<u64>,
+    /// What to do with the text: nothing means describe it, "video" means the
+    /// text is a link to archive.
+    #[serde(default)]
+    pub action: Option<String>,
 }
 
 /// What the phone shows when the job is done.
@@ -66,8 +71,17 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 /// Every exit path leaves `job_view` telling the truth. A job that cannot run
 /// must never sit at `running` forever, which is what happens if the only
 /// writes are "running" and "done".
-pub async fn handle(job: Job, pool: Data<SqlitePool>) -> Result<(), BoxDynError> {
+pub async fn handle(
+    job: Job,
+    pool: Data<SqlitePool>,
+    downloads: Data<Downloads>,
+) -> Result<(), BoxDynError> {
     mark_running(&pool, &job).await?;
+
+    if job.action.as_deref() == Some("video") {
+        let dir: &Downloads = &downloads;
+        return archive(&pool, &job, &dir.0).await;
+    }
 
     // Nothing to describe is permanent: retrying cannot fix it, so record the
     // reason and finish rather than burning five attempts.
@@ -91,6 +105,25 @@ pub async fn handle(job: Job, pool: Data<SqlitePool>) -> Result<(), BoxDynError>
     Ok(())
 }
 
+/// Resolve the shared link and save its best stream, then record where it went.
+async fn archive(
+    pool: &SqlitePool,
+    job: &Job,
+    into: &std::path::Path,
+) -> Result<(), BoxDynError> {
+    match media::save_video(&job.text, into).await {
+        Ok(saved) => {
+            record_json(pool, job, saved).await?;
+            Ok(())
+        }
+        Err(reason) => {
+            // A dead link is not worth five attempts; say what happened.
+            record_failed(pool, job, &reason).await?;
+            Ok(())
+        }
+    }
+}
+
 async fn mark_running(pool: &SqlitePool, job: &Job) -> Result<(), sqlx::Error> {
     sqlx::query(
         "UPDATE job_view SET status = 'running', attempts = attempts + 1, done_at = NULL \
@@ -103,7 +136,15 @@ async fn mark_running(pool: &SqlitePool, job: &Job) -> Result<(), sqlx::Error> {
 }
 
 async fn record_done(pool: &SqlitePool, job: &Job) -> Result<(), BoxDynError> {
-    let outcome = serde_json::to_string(&job.run())?;
+    record_json(pool, job, serde_json::to_value(job.run())?).await
+}
+
+async fn record_json(
+    pool: &SqlitePool,
+    job: &Job,
+    value: serde_json::Value,
+) -> Result<(), BoxDynError> {
+    let outcome = value.to_string();
     sqlx::query("UPDATE job_view SET status = 'done', result = ?2, done_at = ?3 WHERE id = ?1")
         .bind(&job.id)
         .bind(outcome)
@@ -133,6 +174,7 @@ mod tests {
             id: "t".into(),
             text: text.into(),
             work_ms: None,
+            action: None,
         }
     }
 

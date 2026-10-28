@@ -3,8 +3,12 @@ package dev.kouragita.pocket
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Environment
+import android.provider.MediaStore
+import java.io.File
 import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.os.Build
@@ -61,13 +65,13 @@ class MainActivity : Activity() {
             }
         }
 
-        sharedText(intent)?.let { submit(it) }
+        sharedText(intent)?.let(::offerActions)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        sharedText(intent)?.let { submit(it) }
+        sharedText(intent)?.let(::offerActions)
     }
 
     override fun onResume() {
@@ -127,13 +131,48 @@ class MainActivity : Activity() {
         return ScrollView(this).apply { addView(column) }
     }
 
+    /** A link can be archived; plain text can only be described. */
+    private fun offerActions(text: String) {
+        if (!text.contains("/status/")) {
+            submit(text)
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Save this post")
+            .setItems(arrayOf("Download the video", "Just describe the text")) { _, which ->
+                if (which == 0) submit(text, action = "video") else submit(text)
+            }
+            .show()
+    }
+
     /** The queue takes the text from a share, then reports back through a notification. */
-    private fun submit(text: String, workMs: Long? = null) {
+    private fun submit(text: String, workMs: Long? = null, action: String? = null) {
         io.execute {
-            val id = PocketClient.submit(text, workMs) ?: return@execute
-            val job = PocketClient.awaitDone(id) ?: return@execute
-            Notifier.done(applicationContext, job)
+            val id = PocketClient.submit(text, workMs, action) ?: return@execute
+            val job = PocketClient.awaitDone(id, timeoutMs = 180_000) ?: return@execute
+            val published = job.savedFile?.let(::publishToDownloads)
+            Notifier.done(applicationContext, job, published)
             refresh()
+        }
+    }
+
+    /** MediaStore keeps the file visible in Files and Gallery, not buried in app data. */
+    private fun publishToDownloads(path: String): String? {
+        return try {
+        val source = File(path)
+        if (!source.isFile) return null
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, source.name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/Pocket")
+        }
+        val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+        uri?.let {
+            contentResolver.openOutputStream(it)?.use { out -> source.inputStream().use { input -> input.copyTo(out) } }
+        }
+        source.name
+        } catch (_: Exception) {
+            null
         }
     }
 

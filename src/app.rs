@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tokio::sync::OnceCell;
 
-use crate::{http, job, queue};
+use crate::{http, job, media, queue};
 
 /// Shared handle to the database.
 ///
@@ -65,9 +65,11 @@ impl App for Pocket {
                 health.set(Health::Healthy);
                 ctx.ready();
 
+                let downloads = media::Downloads(root.join("downloads"));
                 let worker = WorkerBuilder::new(queue::worker_name())
                     .backend(queue::storage(&pool))
                     .data(pool.clone())
+                    .data(downloads)
                     .concurrency(1)
                     .build(job::handle);
 

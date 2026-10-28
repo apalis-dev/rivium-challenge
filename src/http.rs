@@ -17,6 +17,8 @@ pub struct NewJob {
     pub text: String,
     #[serde(default)]
     pub work_ms: Option<u64>,
+    #[serde(default)]
+    pub action: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -50,6 +52,7 @@ async fn enqueue(
         id: queue::new_id(),
         text: body.text,
         work_ms: body.work_ms,
+        action: body.action,
     };
     let id = job.id.clone();
     let pool = ready(&db)?;
