@@ -14,7 +14,7 @@ The original challenge brief is preserved as [CHALLENGE.md](CHALLENGE.md).
 
 Share a snippet from Chrome, a note, anywhere:
 
-```
+```text
 Share → Pocket  →  POST 127.0.0.1:8787/jobs  →  SQLite  →  worker  →  notification
 ```
 
@@ -24,14 +24,14 @@ system killing it, loses nothing. Reopen and the work finishes.
 One job type: count the characters and words, find the distinct words, and take an
 FNV-1a hash so the same text always gives the same fingerprint.
 
-![job list](docs/pocket-list.png)
+![job list on the phone](docs/pocket-list.png)
 
 Note the `done · attempt 2` entry — that job was killed mid-flight and recovered by
 the next launch. When it finishes, the result arrives as a notification:
 
 ![notification](docs/pocket-notification.png)
 
-A short recording of the flow is in [`docs/share.gif`](docs/share.gif).
+Both are from the phone. A short recording of the flow is in [`docs/share.gif`](docs/share.gif).
 
 ## How it works
 
@@ -71,7 +71,7 @@ curl -s localhost:8787/jobs/<id>
 
 Real output:
 
-```
+```text
 POST /jobs -> {"id":"01M5YT2EEDAV70HZJF6FH32G3C"}
 done after ~1300ms
 {"id":"01M5YT2EEDAV70HZJF6FH32G3C","text":"the quick brown fox over the lazy dog",
@@ -85,7 +85,7 @@ without it, a job longer than 3 s is cut off instead of allowed to finish.
 
 Ctrl-C with a 4 s job running:
 
-```
+```text
 state before signal:  ('running', 1)
 process exit code:    0
 state after shutdown: ('done', 1)
@@ -123,12 +123,33 @@ curl -s localhost:8787/readyz
 
 Measured on the emulator:
 
-```
+```text
 enqueue 6 s job → before force-stop: running|1
 app process count: 0                                  (dead)
 on disk while app is dead: running|1                  (survived)
 relaunch → recovered after ~8.5s → done|2
 ```
+
+## On a real phone
+
+Tested on a TECNO KM7k running Android 15 (API 35), arm64-v8a. Rivium's own Android
+lane only compiles the library and inspects its ELF properties, so these are device
+observations rather than a repeat of CI.
+
+- The APK ships `arm64-v8a` and `x86_64`; the phone installed **only** `arm64`
+  (`primaryCpuAbi=arm64-v8a`, `secondaryCpuAbi=null`), so the arm64 build is the one that
+  actually ran.
+- The host was ready about **1 s** after launch, and a shared note finished in about
+  **0.5 s**.
+- `am force-stop` during a 6 s job left the row `running` on disk. Relaunching reclaimed
+  it after about **4.5 s** and finished with `attempts = 2`.
+- The first cold start showed an empty list even though the queue had jobs: the list was
+  fetched before the listener existed and never retried. Fixed by refreshing when the host
+  reports ready and again in `onResume`. The emulator hid this because every test there
+  began with a share.
+- This phone's software build has no `sqlite3` binary, unlike the emulator image, so
+  reading the database meant copying it off the device with `run-as ... cat` and querying
+  it locally.
 
 ## Versions
 
@@ -148,9 +169,8 @@ Pinned exactly; `Cargo.lock` is committed.
 
 ## Known limits
 
-- **Tested on an x86_64 emulator (API 36), not a physical phone.** The `arm64-v8a`
-  library is built and verified (ELF64 AArch64, every `LOAD` aligned to 16 KB, exactly
-  one `JNI_OnLoad`), but it has not been run on arm64 hardware.
+- Tested on one physical phone (TECNO KM7k, Android 15, arm64-v8a) and one x86_64
+  emulator (API 36). Nothing else was tried.
 - Delivery is **at-least-once**. The handler is idempotent, so a retry overwrites the
   same row rather than duplicating results.
 - `apalis-sqlite` sets `PRAGMA synchronous = OFF`. Jobs survive process death, but not
@@ -164,7 +184,7 @@ Pinned exactly; `Cargo.lock` is committed.
 
 ## Layout
 
-```
+```text
 src/app.rs      App impl: two supervised services, the shared database handle
 src/queue.rs    SQLite storage, migrations, job_view, unique worker names
 src/job.rs      the job, its result, and the Apalis handler

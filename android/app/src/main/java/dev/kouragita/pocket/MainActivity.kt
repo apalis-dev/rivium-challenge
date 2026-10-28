@@ -25,10 +25,16 @@ class MainActivity : Activity() {
                     is Host.Result.Ready -> result.version
                     is Host.Result.Failed -> "host failed (${result.code}): ${result.message}"
                 }
+                // Anything fetched before the listener existed came back empty.
+                refresh()
             }
         }
 
         sharedText(intent)?.let(::submit)
+    }
+
+    override fun onResume() {
+        super.onResume()
         refresh()
     }
 
