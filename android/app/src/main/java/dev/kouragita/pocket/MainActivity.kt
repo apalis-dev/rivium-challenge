@@ -31,6 +31,8 @@ class MainActivity : Activity() {
     private lateinit var summary: TextView
     private lateinit var hint: TextView
     private lateinit var jobs: LinearLayout
+    private lateinit var tabs: LinearLayout
+    private lateinit var samples: LinearLayout
 
     /** One worker thread serialises HTTP calls, so polls can never overlap. */
     private val io = Executors.newSingleThreadExecutor { runnable ->
@@ -46,6 +48,10 @@ class MainActivity : Activity() {
             handler.postDelayed(this, 700)
         }
     }
+
+    /** Which tab is showing: 0 library, 1 downloads, 2 queue. */
+    private var selectedTab = 0
+    private var lastJobs: List<PocketClient.Job> = emptyList()
 
     /** Job ids already handed to MediaStore this session. */
     private val publishAttempted = java.util.Collections.synchronizedSet(mutableSetOf<String>())
@@ -145,8 +151,14 @@ class MainActivity : Activity() {
             setPadding(0, 8, 0, 16)
         }
         jobs = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        tabs = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 12, 0, 4)
+        }
+        refreshTabs()
+        samples.visibility = LinearLayout.GONE
 
-        val samples = LinearLayout(this).apply {
+        samples = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, 8, 0, 16)
             addView(
@@ -168,6 +180,7 @@ class MainActivity : Activity() {
             setPadding(48, 96, 48, 48)
             addView(status)
             addView(summary)
+            addView(tabs)
             addView(hint)
             addView(samples)
             addView(jobs)
@@ -293,6 +306,7 @@ class MainActivity : Activity() {
     private fun render(current: List<PocketClient.Job>) {
         if (current == rendered) return
         rendered = current
+        lastJobs = current
 
         summary.text = when (current.size) {
             0 -> "Nothing queued yet"
@@ -309,14 +323,42 @@ class MainActivity : Activity() {
         }
         hint.visibility = if (current.isEmpty()) LinearLayout.VISIBLE else LinearLayout.GONE
 
+        // The sample buttons are a testing affordance; they belong to the queue view.
+        if (::samples.isInitialized) {
+            samples.visibility = if (selectedTab == 2) LinearLayout.VISIBLE else LinearLayout.GONE
+        }
+
         jobs.removeAllViews()
-        val groups = current.groupBy { it.topics.firstOrNull() ?: "Unsorted" }
-        groups.keys
-            .sortedWith(compareBy({ it == "Unsorted" }, { it.lowercase() }))
-            .forEach { topic ->
-                jobs.addView(heading(topic, groups.getValue(topic).size))
-                groups.getValue(topic).forEach { jobs.addView(row(it)) }
+        val saved = current.filter { it.savedFile != null || it.raw?.optString("kind") == "card" }
+
+        when (selectedTab) {
+            // Library: what you kept, filed by topic.
+            0 -> {
+                if (saved.isEmpty()) {
+                    jobs.addView(empty("Nothing saved yet. Share a post and pick Download or Save a card."))
+                }
+                val groups = saved.groupBy { it.topics.firstOrNull() ?: "Unsorted" }
+                groups.keys
+                    .sortedWith(compareBy({ it == "Unsorted" }, { it.lowercase() }))
+                    .forEach { topic ->
+                        jobs.addView(heading(topic, groups.getValue(topic).size))
+                        groups.getValue(topic).forEach { jobs.addView(row(it)) }
+                    }
             }
+            // Downloads: the files themselves, newest first.
+            1 -> {
+                if (saved.isEmpty()) {
+                    jobs.addView(empty("No files yet. Saved videos and cards appear in Downloads/Pocket."))
+                }
+                jobs.addView(heading("Saved files", saved.size))
+                saved.reversed().forEach { jobs.addView(row(it)) }
+            }
+            // Queue: everything, including what is still running or failed.
+            else -> {
+                if (current.isEmpty()) jobs.addView(empty("Nothing queued yet."))
+                current.forEach { jobs.addView(row(it)) }
+            }
+        }
     }
 
     /** Decode a saved thumbnail at list size rather than full resolution. */
@@ -333,7 +375,38 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun refreshTabs() {
+        tabs.removeAllViews()
+        listOf("Library", "Downloads", "Queue").forEachIndexed { index, label ->
+            tabs.addView(
+                TextView(this).apply {
+                    text = label
+                    textSize = 16f
+                    setPadding(0, 10, 56, 10)
+                    alpha = if (selectedTab == index) 1f else 0.45f
+                    paint.isFakeBoldText = selectedTab == index
+                    setOnClickListener {
+                        if (selectedTab != index) {
+                            selectedTab = index
+                            refreshTabs()
+                            samples.visibility = if (index == 2) LinearLayout.VISIBLE else LinearLayout.GONE
+                            rendered = emptyList()
+                            render(lastJobs)
+                        }
+                    }
+                },
+            )
+        }
+    }
+
     /** Section heading: the context a person would look under. */
+    private fun empty(message: String): TextView = TextView(this).apply {
+        text = message
+        textSize = 14f
+        alpha = 0.6f
+        setPadding(0, 16, 0, 24)
+    }
+
     private fun heading(topic: String, count: Int): TextView = TextView(this).apply {
         text = "${topic.replaceFirstChar { it.uppercase() }}  ·  $count"
         textSize = 13f
@@ -379,6 +452,13 @@ class MainActivity : Activity() {
             textSize = 15f
             setPadding(0, 6, 0, 6)
         })
+        job.savedBytes?.let { bytes ->
+            body.addView(TextView(this).apply {
+                text = "%.1f MB".format(bytes / 1_048_576.0)
+                textSize = 12f
+                alpha = 0.6f
+            })
+        }
         if (job.topics.isNotEmpty()) {
             body.addView(TextView(this).apply {
                 text = job.topics.joinToString("   ") { "#$it" }
