@@ -25,32 +25,15 @@ The job describes text — characters, words, distinct words and an FNV-1a hash 
 text always gives the same fingerprint — or, when the shared text is a post link, it saves
 that post as a video or as a card. One worker and one queue serve all three.
 
-Four states, all captured on the phone. Empty, and working:
+Rows carry their state: `done`, an amber `recovered · attempt N` when the process was
+killed mid-job, and a red `failed` that records the reason instead of pretending to run.
+Tapping a row opens the full result and offers to delete the file:
 
-![empty state](docs/pocket-empty.png)
+![detail of a job](docs/pocket-detail.png)
 
-![a job working](docs/pocket-working.png)
-
-Once jobs exist, the list distinguishes them at a glance — `done`, an amber
-`recovered · attempt 2`, and a red `failed`:
-
-![job list on the phone](docs/pocket-list.png)
-
-A job that cannot succeed is not left pretending to run — it records why:
-
-![failed state](docs/pocket-failed.png)
-
-Tapping any row opens the full result. A failure shows the reason:
-
-![detail of a failed job](docs/pocket-detail.png)
-
-A finished job shows its statistics, the attempt count, and the hash in monospace:
-
-![detail of a finished job](docs/pocket-detail-result.png)
-
-A finished text job arrives as a notification carrying **Copy hash** and **Share result**. A saved post announces where the file went and offers **Share result**:
-
-![notification](docs/pocket-notification.png)
+A finished text job arrives as a notification carrying **Copy hash** and **Share result**; a
+saved post announces where the file went and offers **Share result**, as the recording below
+shows.
 
 [`docs/pocket-story.mp4`](docs/pocket-story.mp4) is one continuous recording on the phone, no
 cuts: the ESPN post open in the X app, Share, Share via…, Pocket, **Download the video**, Settings
@@ -218,9 +201,9 @@ The app has three views behind a bottom bar:
 Library files what you kept under its topic, Downloads lists the files with their sizes,
 and Queue keeps the live states, including the ones that were interrupted and resumed.
 
-Saved posts keep their thumbnail, so the list leads with the image and the topic:
+Saved posts keep their thumbnail, so the list leads with the image and the topic.
 
-![the library, grouped by topic](docs/pocket-library.png)
+The three views themselves are the screenshots above.
 
 A card saved from a link, drawn on the device:
 
