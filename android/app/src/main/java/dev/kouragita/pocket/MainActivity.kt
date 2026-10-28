@@ -87,7 +87,29 @@ class MainActivity : Activity() {
             }
         }
 
-        sharedText(intent)?.let(::offerActions)
+        val shared = sharedText(intent)
+        if (shared != null && shared.contains("/status/") && OverlayChooser.canShow(this)) {
+            // Ask over whatever the user was doing, then get out of the way.
+            startOverlay(shared)
+            finish()
+            return
+        }
+        shared?.let(::offerActions)
+    }
+
+    /** Chooses a format without taking the screen, then leaves the app running in the background. */
+    private fun startOverlay(link: String) {
+        WorkerService.start(applicationContext)
+        OverlayChooser.show(applicationContext, link) { action ->
+            Thread {
+                var waited = 0
+                while (!PocketClient.isReady() && waited < 40) {
+                    Thread.sleep(250)
+                    waited++
+                }
+                PocketClient.submit(link, null, action)
+            }.start()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -217,6 +239,15 @@ class MainActivity : Activity() {
         }
         AlertDialog.Builder(this)
             .setTitle("Save this post")
+            .setNeutralButton("Quick save") { _, _ ->
+                // Without this permission the chooser has to open the app.
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:$packageName"),
+                    ),
+                )
+            }
             .setItems(arrayOf("Download the video", "Save a card image", "Just describe the text")) { _, which ->
                 when (which) {
                     0 -> submit(text, action = "video")

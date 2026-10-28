@@ -184,6 +184,11 @@ request, so a dropped connection costs what was missed rather than the whole fil
 Verified by killing the app mid-transfer — 3.5 MB on disk, relaunched, finished at
 exactly 11,493,459 bytes on attempt 2.
 
+With the "display over other apps" permission, a shared link never opens the app at all:
+a small panel appears over whatever you were using — **Video**, **Card** or **Text** — and
+the work continues in the background while you carry on. Without the permission the app
+falls back to asking inside itself, and offers a shortcut to grant it.
+
 Choosing a format is the last thing you have to do. A foreground service keeps the
 transfer and the publishing going after you leave the app, so you can go back to
 scrolling or share another link while Pocket works. Verified with the app sent to the
