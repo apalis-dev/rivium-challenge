@@ -69,14 +69,18 @@ curl -s -X POST localhost:8787/jobs \
 curl -s localhost:8787/jobs/<id>
 ```
 
-Real output:
+Real output, copied as-is:
 
 ```text
-POST /jobs -> {"id":"01M5YT2EEDAV70HZJF6FH32G3C"}
-done after ~1300ms
-{"id":"01M5YT2EEDAV70HZJF6FH32G3C","text":"the quick brown fox over the lazy dog",
- "status":"done","attempts":1,
- "result":{"chars":43,"elapsed_ms":0,"hash":"7404cea13ff89bb0","unique_words":8,"words":9}}
+$ curl -s -o /dev/null -w '%{http_code}\n' localhost:8787/readyz
+200
+
+$ curl -s -X POST localhost:8787/jobs -H 'content-type: application/json' \
+    -d '{"text":"the quick brown fox jumps over the lazy dog"}'
+{"id":"01M60MVD49KFX9KCPJ6Q4KCKHH"}
+
+$ curl -s localhost:8787/jobs/01M60MVD49KFX9KCPJ6Q4KCKHH
+{"id":"01M60MVD49KFX9KCPJ6Q4KCKHH","text":"the quick brown fox jumps over the lazy dog","status":"done","attempts":1,"result":{"chars":43,"elapsed_ms":0,"hash":"7404cea13ff89bb0","unique_words":8,"words":9},"enqueued_at":1793170715785,"done_at":1793170715808}
 ```
 
 `work_ms` is a debug knob that makes a job slow on purpose — useful for the tests
@@ -91,6 +95,32 @@ process exit code:    0
 state after shutdown: ('done', 1)
 residue:              none
 ```
+
+### Why the worker name changes every run
+
+`src/queue.rs` names each worker `pocket-<ulid>`. That is not decoration — it is what
+makes a crashed run's job recoverable. The transcript below comes from a throwaway
+harness that pushes a job and runs a worker over the same `src/queue.rs`; the app does
+exactly this, with the name it generates. Same job, same database, only the name differs:
+
+```text
+$ ./negctl $DB work fixed            # first run, killed -9 after 3 s
+worker pocket-fixed
+   running|1
+
+$ ./negctl $DB work fixed            # same name, restarting
+worker pocket-fixed
+Error: BackendError(PollNextError(Database(Io(Custom { kind: AlreadyExists, error: "WORKER_ALREADY_EXISTS" }))))
+   running|1                         # after 8 s: still stuck
+
+$ ./negctl $DB work                  # fresh name, as the app does
+worker pocket-01M60MXS5W7NR55BBH1FFV1M9A
+   recovered after 6s
+   done|2
+```
+
+The dead worker's row is still in Apalis's `Workers` table, so the same name cannot
+re-register. A fixed name therefore turns every crash into a permanently `running` job.
 
 ## Run it on a phone
 
@@ -121,14 +151,6 @@ curl -s localhost:8787/readyz
 | Job fails | Retried up to 5 attempts with backoff |
 | Shutdown with a job running | Listener stops, worker drains, exit code 0 |
 
-Measured on the emulator:
-
-```text
-enqueue 6 s job → before force-stop: running|1
-app process count: 0                                  (dead)
-on disk while app is dead: running|1                  (survived)
-relaunch → recovered after ~8.5s → done|2
-```
 
 ## On a real phone
 
