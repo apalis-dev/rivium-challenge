@@ -5,6 +5,8 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.drawable.GradientDrawable
+import android.view.View
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -160,18 +162,47 @@ class MainActivity : Activity() {
         current.forEach { jobs.addView(row(it)) }
     }
 
-    private fun row(job: PocketClient.Job): TextView = TextView(this).apply {
-        text = buildString {
-            append(job.statusLine)
-            append("\n")
-            append(job.text.take(80))
-            val detail = job.detail
-            if (detail.isNotEmpty()) append("\n$detail")
+    private fun row(job: PocketClient.Job): View {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = 28f
+                setColor(0x14888888)
+            }
+            setPadding(36, 24, 36, 24)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = 16 }
+            isClickable = true
+            setOnClickListener { showDetail(job) }
         }
-        textSize = 14f
-        setPadding(0, 16, 0, 16)
-        setOnClickListener { showDetail(job) }
+
+        card.addView(TextView(this).apply {
+            text = job.statusLine
+            textSize = 12f
+            letterSpacing = 0.06f
+            if (job.status == "failed") {
+                setTextColor(0xFFD9534F.toInt())
+            } else {
+                alpha = 0.7f
+            }
+        })
+        card.addView(TextView(this).apply {
+            text = job.text.take(120)
+            textSize = 15f
+            setPadding(0, 6, 0, 6)
+        })
+        job.detail.takeIf { it.isNotEmpty() }?.let { detail ->
+            card.addView(TextView(this).apply {
+                text = detail
+                textSize = 13f
+                alpha = 0.7f
+            })
+        }
+        return card
     }
+
 
     private fun showDetail(job: PocketClient.Job) {
         val outcome = job.outcome
