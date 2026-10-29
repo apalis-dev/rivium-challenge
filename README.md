@@ -314,9 +314,9 @@ Tested on a TECNO KM7k running Android 15 (API 35), arm64-v8a. Rivium's own Andr
 lane only compiles the library and inspects its ELF properties, so these are device
 observations rather than a repeat of CI.
 
-- The APK ships `arm64-v8a` and `x86_64`; the phone installed **only** `arm64`
+- The app builds `arm64-v8a` and `x86_64`; the phone installed **only** `arm64`
   (`primaryCpuAbi=arm64-v8a`, `secondaryCpuAbi=null`), so the arm64 build is the one that
-  actually ran.
+  actually ran. The APK on the release page is the arm64-v8a one the product repo ships.
 - The host was ready about **1 s** after launch, and a shared note finished in about
   **0.5 s**.
 - `am force-stop` during a 6 s job left the row `running` on disk. Relaunching reclaimed
@@ -343,7 +343,7 @@ Pinned exactly; `Cargo.lock` is committed.
 | cargo-ndk | 4.1.2 |
 | JDK / Gradle / AGP | 21.0.13 / 9.8.2 / 9.4.1 |
 | minSdk / compileSdk | 30 / 36 |
-| ABIs | `arm64-v8a`, `x86_64` |
+| ABIs | `arm64-v8a`, `x86_64` in a local debug build; the published release APK is `arm64-v8a` only |
 
 ## Known limits
 
