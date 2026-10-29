@@ -13,9 +13,13 @@
 ## Demos & Screenshots
 
 * **Metadata Cleanup:** Before and after comparison showing stripped GPS and device metadata.
+https://github.com/user-attachments/assets/cf8e8709-d3db-4047-8dea-39a2e12406dd
 * **Crash Resilience:** App killed mid-processing, reopened, and seamlessly resuming remaining jobs.
+https://github.com/user-attachments/assets/87c15231-2551-44f2-b15f-f4087acb0dac
 * **Terminal output (`cargo run`):** `photo cleaned ... gps_removed=true`
+* <img width="673" height="229" alt="Screenshot 2026-10-29 110157" src="https://github.com/user-attachments/assets/d14c7182-6844-4f95-8646-90d97cb54a58" />
 * **Test Device:** Running on Android 14 (Samsung Galaxy A13).
+<img width="760" height="142" alt="device" src="https://github.com/user-attachments/assets/a3bc2eee-d634-4c5d-9ace-d6921e5860ad" />
 
 ---
 
