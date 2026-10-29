@@ -18,9 +18,9 @@ A signed, sideloadable build is published at
 release page). The app has its own repository at
 [kouragita/pocket](https://github.com/kouragita/pocket); this branch is where it grew up.
 
-It is signed with its own key rather than the debug key, so if a debug build of the same
-package is already installed, uninstall it first — Android refuses to replace an app with a
-different signing key.
+Debug and release builds share this project's key when it is configured, so the release
+installs straight over a debug build; an APK signed with a different key would still need an
+uninstall first.
 
 ## What it does
 
