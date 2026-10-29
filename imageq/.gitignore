@@ -1,0 +1,10 @@
+target/
+jniLibs/
+*.so
+build/
+.gradle/
+.idea/
+local.properties
+*.jpg
+*.jpeg
+*.mp4

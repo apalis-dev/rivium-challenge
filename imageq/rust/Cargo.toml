@@ -1,0 +1,22 @@
+[package]
+name = "imageq"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+tracing = "0.1"
+apalis = "1"
+apalis-sqlite = "1"
+hex = "0.4"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+rivium = { version = "0.2", features = ["rt"] }
+rivium-host = { version = "0.2", features = ["process"] }
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.11"
+sqlx = { version = "0.9", default-features = false, features = ["sqlite", "runtime-tokio"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "fs"] }
+rivium-jni = "0.2"
+kamadak-exif = "0.6"
