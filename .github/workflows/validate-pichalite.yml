@@ -1,0 +1,41 @@
+name: Validate PichaLite challenge
+on:
+  push:
+    branches: [pichalite]
+    paths:
+      - 'pichalite/**'
+      - '.github/workflows/validate-pichalite.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.94.0'
+          components: rustfmt, clippy
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: false
+      - name: Install Android SDK and NDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018'
+      - name: Install Pillow for smoke tests
+        run: python3 -m pip install Pillow
+      - name: Validate Rust and build Android
+        run: bash pichalite/build.sh --all
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: challenge-pichalite-debug-apk
+          path: pichalite/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 3
