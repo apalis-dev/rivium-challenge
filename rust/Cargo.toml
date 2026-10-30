@@ -1,0 +1,27 @@
+[package]
+name = "mchoro"
+rust-version = "1.92"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+apalis = "=1.0.0"
+apalis-sqlite = "=1.0.0"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
+rivium = { version = "=0.2.0", features = ["rt"] }
+rivium-host = { version = "=0.2.0", features = ["process", "embedded"] }
+rivium-jni = "=0.2.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tokio = { version = "1.54.1", features = ["full"] }
+# Bundle SQLite so the same code links on Android (no system libsqlite3 in the NDK).
+libsqlite3-sys = { version = "0.37", features = ["bundled"] }
+tracing = "0.1.44"
+material-colors = { version = "=0.5.0", features = ["quantize", "serde"] }
+
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+strip = true
