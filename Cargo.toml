@@ -1,0 +1,26 @@
+[package]
+name = "rivium-challenge"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "rivium_challenge"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "rivium-challenge"
+path = "src/main.rs"
+
+[dependencies]
+apalis = "=1.0.0"
+apalis-sqlite = "=1.0.0"
+tokio = { version = "1", features = ["full"] }
+sha2 = "0.10"
+url = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+jni = "=0.21.1"
+rivium = { version = "=0.2.0", features = ["rt"] }
+rivium-host = { version = "=0.2.0", features = ["process"] }
+rivium-jni = "=0.2.0"
+sqlx = { version = "=0.9.0", default-features = false, features = ["runtime-tokio", "sqlite"] }
