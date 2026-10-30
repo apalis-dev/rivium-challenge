@@ -1,77 +1,92 @@
-# rivium-challenge
-rivium + apalis pocket backend challenge
+# imageq
 
-Run a small background job queue **inside an Android app**, and trigger it with one cool Android feature.
+**Strip photo metadata before sharing.**
 
-**Time:** 1 week | **Level:** new to Rust is fine
+## What Problem Does This Solve?
 
-## The idea
+**The Problem:** Every time you take a photo with your phone, it quietly bakes invisible data; like your exact GPS coordinates, when the photo was taken, and your device model directly into the image file. When you text or share that photo online, anyone can extract that private information.
 
-- **[Rivium](https://github.com/rivium-rs/rivium)** starts and stops your Rust code cleanly, on a laptop or inside an Android app.
-- **[Apalis](https://github.com/apalis-dev/apalis)** runs background jobs (think "do this task later, retry if it fails").
-- **An Android feature** is how jobs get started or how results show up on the phone.
+**The Solution:** `imageq` sits quietly in your phone's share sheet. When you share a photo to it, an embedded background worker cleans the image by re-encoding it into a fresh JPEG, completely erasing all hidden metadata, and gives you a safe, private copy ready to send.
 
-Your goal: connect all three so that something useful happens on a real phone or emulator.
+---
 
-## What to build
+## Demos & Screenshots
 
-A tiny Android app where:
+* **Metadata Cleanup:** Before and after comparison showing stripped GPS and device metadata.
+https://github.com/user-attachments/assets/cf8e8709-d3db-4047-8dea-39a2e12406dd
+* **Crash Resilience:** App killed mid-processing, reopened, and seamlessly resuming remaining jobs.
+https://github.com/user-attachments/assets/87c15231-2551-44f2-b15f-f4087acb0dac
+* **Terminal output (`cargo run`):** `photo cleaned ... gps_removed=true`
+* <img width="673" height="229" alt="Screenshot 2026-10-29 110157" src="https://github.com/user-attachments/assets/d14c7182-6844-4f95-8646-90d97cb54a58" />
+* **Test Device:** Running on Android 14 (Samsung Galaxy A13).
+<img width="760" height="142" alt="device" src="https://github.com/user-attachments/assets/a3bc2eee-d634-4c5d-9ace-d6921e5860ad" />
 
-1. Something on the phone creates a job (a button, a tile, a shared link, a photo, anything).
-2. A Rust worker, running under Rivium, does the job.
-3. The result shows up on the phone (notification, widget, screen, etc.).
+---
 
-## Must haves
+## How It Works
 
-- [ ] Rust code uses both Rivium and Apalis
-- [ ] **One** job type is enough
-- [ ] Runs on your laptop first with `cargo run` (no phone needed)
-- [ ] Runs inside the Android app
-- [ ] Jobs are saved, so they are still there after you close and reopen the app
-- [ ] **One** Android feature from the list below
-- [ ] A short README: what it does, how to run it, which versions you used
+* **Background Processing:** Uses an [Apalis](https://github.com/apalis-dev/apalis) SQLite queue (max 3 retries per photo).
+* **Cross-Platform Engine:** The core Rust worker runs via [Rivium](https://github.com/rivium-rs/rivium) (`photo-worker`). It runs natively on desktop via `rivium-host` or inside the Android app using JNI (`rivium_jni`). Kotlin initializes the engine with `Bridge.nativeStart(["--root", filesDir])`.
+* **Android Integration:** When you share images via `ACTION_SEND` or `SEND_MULTIPLE`, Kotlin copies the files into `files/inbox/` (`name.part`, then renames on completion) since Rust cannot read Android `content://` URIs directly. A background worker polls the inbox every 2 seconds to enqueue jobs.
+* **Output & State:** Processed photos end up in `clean/<hash>.jpg` and `thumbs/<hash>.jpg`, with job details stored in a SQLite database (`cleaned` table). The Kotlin frontend reads this database to render the UI and fire progress notifications via an Android Foreground Service.
+* **Persistence:** Because job states live in a local SQLite file, interrupting or force-closing the app won't lose work—it resumes right where it left off when reopened.
 
-## Some Android feature examples
+---
 
-| Feature | Example |
-|---|---|
-| Quick Settings tile | Tap the tile to start a job |
-| Notification | Show job progress or results |
-| Home screen widget | Show how many jobs are waiting |
-| Share Sheet | Share a link to your app and it gets processed |
-| Camera / Photo Picker | Each photo becomes a job (resize, hash, etc.) |
-| Your own idea | Tell us in an issue first |
+## Local Development (Desktop)
 
-## Suggested steps
+Requires Rust 1.92+.
 
-1. Run Rivium's basic example:
-   ```bash
-   cargo run -p rivium-examples --example basic-service -- --root target/basic-example
-   ```
-2. Get an Apalis job running in a plain Rust program (no Android yet).
-3. Put that worker inside a Rivium service.
-4. Follow Rivium's JNI example to load it in Android.
-5. Add your Android feature last.
+```bash
+cd rust
+cargo run --release --bin imageq -- --root target/demo-root
 
-Rivium needs Rust 1.92 or newer. Both libraries are still changing, so **pin the versions** you use and follow their current docs and examples.
+# In a second terminal (or copy manually on Windows):
+cp photo.jpg target/demo-root/inbox/
 
-## Scoring (100 points)
+```
 
-| What | Points |
-|---|---:|
-| It works end to end | 40 |
-| The Android feature is creative and actually used | 30 |
-| Jobs survive closing the app | 15 |
-| README is clear | 15 |
+> **Tip:** Use a photo with location services enabled to test metadata removal. Processed outputs will appear in `target/demo-root/clean/`, logs in `logs/imageq/imageq.log`, and state entries in `imageq.db`.
 
-**Bonus (+10):** test on a real phone and write down what happened. Rivium's own Android checks only confirm it compiles, so this is useful to the maintainers.
+---
 
-## Submit
+## Android Build
 
-A PR with your code, the README, and a short video or GIF of it working.
+```bash
+# Add targets and toolchain
+rustup target add armv7-linux-androideabi aarch64-linux-android
+cargo install cargo-ndk
 
-## Tips
+# Build native libs
+cd rust
+cargo ndk -t armeabi-v7a -t arm64-v8a -o ../android/app/src/main/jniLibs build --release --lib
 
-- Stuck on Rust errors? Make it work on your laptop first, then move to Android.
-- Keep it small. A simple idea that works beats a big one that doesn't.
-- Questions about Rivium? Open an issue with the version, platform and a small example.
+```
+
+1. Open `android/` in Android Studio.
+2. Build and deploy to your test device.
+3. Grant notification permissions, then test by sharing photos from your Gallery app.
+
+> **Note:** The Android package name must remain `com.example.imageq` to match the JNI export configuration (`export!`).
+
+---
+
+## Tested Environment & Dependencies
+
+| Component | Version / Environment |
+| --- | --- |
+| **Rust** | 1.99.1 |
+| **Rivium Suite** | 0.2.0 (`rivium`, `rivium-host`, `rivium-jni`) |
+| **Apalis Engine** | 1.0.0 (`apalis`, `apalis-sqlite`) |
+| **Libraries** | `sqlx` 0.9 / `image` 0.25.10 / `kamadak-exif` 0.6 |
+| **Android Toolchain** | `cargo-ndk` 4.1.2 / NDK 30.0.16248370 / `compileSdk` 37 |
+| **Desktop Host** | Windows, `stable-x86_64-pc-windows-gnu` (MinGW GCC 15.2) |
+| **Test Device** | Samsung Galaxy A13 (Android 14, 32-bit system ABI) |
+
+---
+
+## Real-Device Testing Notes
+
+* **JNI Stability:** The Rivium JNI lifecycle (start, status queries, graceful stop) works reliably on physical devices.
+* **Process Interruption:** Force-closing mid-batch causes no data loss; incomplete jobs are picked back up automatically upon re launch.
+* **File Size Efficiency:** In testing, re-encoding at 90 JPEG quality reduced output file sizes by ~13–27% while removing metadata.
