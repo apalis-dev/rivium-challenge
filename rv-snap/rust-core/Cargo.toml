@@ -1,0 +1,37 @@
+[package]
+name = "rivium-snap"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "rivium_snap"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "rivium-snap"
+path = "src/main.rs"
+
+[dependencies]
+rivium = { version = "0.2.0", features = ["rt"] }
+rivium-host = { version = "0.2.0", features = ["embedded"] }
+apalis = "1.0.0"
+apalis-sqlite = "1.0.0"
+apalis-core = "1.0.0"
+sqlx = { version = "0.9", default-features = false, features = ["sqlite", "runtime-tokio"] }
+tokio = { version = "1.40", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.10", features = ["v4"] }
+jni = "0.21"
+blake3 = "1.5"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp", "tiff", "ico"] }
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

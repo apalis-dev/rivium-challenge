@@ -1,0 +1,12 @@
+target/
+snap_test_data/
+.gradle/
+build/
+*.so
+local.properties
+*.iml
+.idea/
+
+# Large demo media — host externally (GitHub limit: 100MB)
+*.gif
+docs/images/demo_laptop.*
