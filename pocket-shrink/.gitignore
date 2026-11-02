@@ -1,0 +1,21 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Android / Gradle
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+
+# SQLite test databases & artifacts
+*.db
+*.db-shm
+*.db-wal
+pocket_desktop.db
+pocket_data/
+pocket-data/
+*.mp4
