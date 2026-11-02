@@ -4,7 +4,7 @@ use apalis::prelude::*;
 use apalis_sqlite::{SqlitePool, SqliteStorage};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteSynchronous};
 use tokio::fs;
 
 use crate::{process_url, result_path};
@@ -36,18 +36,29 @@ pub struct JobResult {
 pub async fn create_storage(
     data_directory: &Path,
 ) -> Result<(SqlitePool, SqliteStorage<ProcessUrlJob>), Box<dyn Error + Send + Sync>> {
+    let pool = connect_pool(data_directory).await?;
+    SqliteStorage::setup(&pool).await?;
+    sqlx::query("PRAGMA synchronous = FULL")
+        .execute(&pool)
+        .await?;
+    Ok((pool.clone(), SqliteStorage::new(&pool)))
+}
+
+pub async fn connect_pool(
+    data_directory: &Path,
+) -> Result<SqlitePool, Box<dyn Error + Send + Sync>> {
     std::fs::create_dir_all(data_directory)?;
     let database_path = data_directory.join("linkqueue.db");
     let options = SqliteConnectOptions::new()
         .filename(database_path)
-        .create_if_missing(true);
+        .create_if_missing(true)
+        .foreign_keys(true)
+        .synchronous(SqliteSynchronous::Full);
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
         .connect_with(options)
         .await?;
-
-    SqliteStorage::setup(&pool).await?;
-    Ok((pool.clone(), SqliteStorage::new(&pool)))
+    Ok(pool)
 }
 
 pub async fn enqueue_url(
@@ -122,13 +133,25 @@ pub async fn run_worker(
     data_directory: &Path,
     stop: impl std::future::Future<Output = ()>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let (_pool, storage) = create_storage(data_directory).await?;
+    let (pool, storage) = create_storage(data_directory).await?;
+    crate::monitoring::setup(&pool).await?;
     let worker = WorkerBuilder::new("linkqueue-worker")
         .backend(storage)
         .build(process_url_job);
+    let monitoring_storage = SqliteStorage::<crate::monitoring::MonitoringJob>::new(&pool);
+    let monitoring_worker = WorkerBuilder::new("linkqueue-monitor-worker")
+        .backend(monitoring_storage)
+        .data(crate::monitoring::MonitoringWorkerData {
+            pool: pool.clone(),
+            config: crate::monitoring::MonitoringConfig::from_environment(),
+        })
+        .build(crate::monitoring::process_job);
+    let scheduler = crate::monitoring::run_scheduler(pool);
 
     tokio::select! {
         result = worker.run() => result.map_err(Into::into),
+        result = monitoring_worker.run() => result.map_err(Into::into),
+        result = scheduler => result,
         _ = stop => Ok(()),
     }
 }

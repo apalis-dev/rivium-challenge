@@ -1,5 +1,6 @@
 mod app;
 pub mod jobs;
+pub mod monitoring;
 
 use std::{
     panic::{AssertUnwindSafe, catch_unwind},
@@ -9,7 +10,7 @@ use std::{
 use jni::{
     JNIEnv,
     objects::{JClass, JString},
-    sys::jstring,
+    sys::{jboolean, jlong, jstring},
 };
 use sha2::{Digest, Sha256};
 use url::Url;
@@ -122,6 +123,150 @@ pub extern "system" fn Java_com_example_linkqueue_NativeBridge_nativeGetResult(
         result.unwrap_or_else(|error| format!("ERROR: {error}"))
     }))
     .unwrap_or_else(|_| "ERROR: Rust result lookup failed".to_owned());
+    jni_string(&mut env, output)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_example_linkqueue_NativeBridge_nativeCreateMonitor(
+    mut env: JNIEnv,
+    _class: JClass,
+    saved_link_id: jlong,
+    input: JString,
+    interval: JString,
+    data_directory: JString,
+) -> jstring {
+    let output = catch_unwind(AssertUnwindSafe(|| {
+        let result = (|| -> Result<String, String> {
+            let input = java_string(&mut env, &input)?;
+            let interval = java_string(&mut env, &interval)?;
+            let root = PathBuf::from(java_string(&mut env, &data_directory)?);
+            let pool = run_with_runtime(jobs::connect_pool(&root))
+                .map_err(|error| error.to_string())?
+                .map_err(|error| error.to_string())?;
+            run_with_runtime(async move {
+                monitoring::setup(&pool)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                monitoring::create_schedule(&pool, saved_link_id, input, &interval).await
+            })
+            .map_err(|error| error.to_string())?
+        })();
+        result.map_or_else(
+            |error| format!("ERROR: {error}"),
+            |id| serde_json::json!({"schedule_id": id}).to_string(),
+        )
+    }))
+    .unwrap_or_else(|_| "ERROR: Could not create monitoring schedule".to_owned());
+    jni_string(&mut env, output)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_example_linkqueue_NativeBridge_nativeSetMonitorEnabled(
+    mut env: JNIEnv,
+    _class: JClass,
+    schedule_id: JString,
+    enabled: jboolean,
+    data_directory: JString,
+) -> jstring {
+    let output = catch_unwind(AssertUnwindSafe(|| {
+        let result = (|| -> Result<(), String> {
+            let schedule_id = java_string(&mut env, &schedule_id)?;
+            let root = PathBuf::from(java_string(&mut env, &data_directory)?);
+            let pool = run_with_runtime(jobs::connect_pool(&root))
+                .map_err(|error| error.to_string())?
+                .map_err(|error| error.to_string())?;
+            run_with_runtime(async move {
+                monitoring::setup(&pool)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                monitoring::set_enabled(&pool, &schedule_id, enabled != 0).await
+            })
+            .map_err(|error| error.to_string())?
+        })();
+        result.map_or_else(|error| format!("ERROR: {error}"), |_| "{}".to_owned())
+    }))
+    .unwrap_or_else(|_| "ERROR: Could not update monitoring schedule".to_owned());
+    jni_string(&mut env, output)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_example_linkqueue_NativeBridge_nativeDeleteMonitor(
+    mut env: JNIEnv,
+    _class: JClass,
+    schedule_id: JString,
+    data_directory: JString,
+) -> jstring {
+    let output = catch_unwind(AssertUnwindSafe(|| {
+        let result = (|| -> Result<(), String> {
+            let schedule_id = java_string(&mut env, &schedule_id)?;
+            let root = PathBuf::from(java_string(&mut env, &data_directory)?);
+            let pool = run_with_runtime(jobs::connect_pool(&root))
+                .map_err(|error| error.to_string())?
+                .map_err(|error| error.to_string())?;
+            run_with_runtime(async move {
+                monitoring::setup(&pool)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                monitoring::delete_schedule(&pool, &schedule_id).await
+            })
+            .map_err(|error| error.to_string())?
+        })();
+        result.map_or_else(|error| format!("ERROR: {error}"), |_| "{}".to_owned())
+    }))
+    .unwrap_or_else(|_| "ERROR: Could not delete monitoring schedule".to_owned());
+    jni_string(&mut env, output)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_example_linkqueue_NativeBridge_nativeDeleteMonitorForLink(
+    mut env: JNIEnv,
+    _class: JClass,
+    saved_link_id: jlong,
+    data_directory: JString,
+) -> jstring {
+    let output = catch_unwind(AssertUnwindSafe(|| {
+        let result = (|| -> Result<(), String> {
+            let root = PathBuf::from(java_string(&mut env, &data_directory)?);
+            let pool = run_with_runtime(jobs::connect_pool(&root))
+                .map_err(|error| error.to_string())?
+                .map_err(|error| error.to_string())?;
+            run_with_runtime(async move {
+                monitoring::setup(&pool)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                monitoring::delete_for_saved_link(&pool, saved_link_id).await
+            })
+            .map_err(|error| error.to_string())?
+        })();
+        result.map_or_else(|error| format!("ERROR: {error}"), |_| "{}".to_owned())
+    }))
+    .unwrap_or_else(|_| "ERROR: Could not delete link monitoring".to_owned());
+    jni_string(&mut env, output)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_example_linkqueue_NativeBridge_nativeGetMonitoring(
+    mut env: JNIEnv,
+    _class: JClass,
+    data_directory: JString,
+) -> jstring {
+    let output = catch_unwind(AssertUnwindSafe(|| {
+        let result = (|| -> Result<String, String> {
+            let root = PathBuf::from(java_string(&mut env, &data_directory)?);
+            let pool = run_with_runtime(jobs::connect_pool(&root))
+                .map_err(|error| error.to_string())?
+                .map_err(|error| error.to_string())?;
+            run_with_runtime(async move {
+                monitoring::setup(&pool)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                monitoring::list_for_android(&pool).await
+            })
+            .map_err(|error| error.to_string())?
+        })();
+        result.unwrap_or_else(|error| format!("ERROR: {error}"))
+    }))
+    .unwrap_or_else(|_| "ERROR: Could not read monitoring data".to_owned());
     jni_string(&mut env, output)
 }
 
