@@ -9,11 +9,19 @@ LinkQueue is an Android link inbox backed by Rust, Apalis, and Rivium. Users can
 - Durable Apalis SQLite jobs processed by an Apalis worker managed by Rivium.
 - JNI integration that starts the embedded worker, enqueues a URL, and reads its result.
 - Room persistence for the Android saved-link list, kept separate from queue and worker-result storage.
+- Recurring availability monitoring using `apalis-cron` schedules reconstructed from Rust-owned SQLite records.
+- Durable monitoring occurrences and results, including HTTP status, response time, and redacted final URLs.
 - A standalone laptop worker and enqueue command for demonstrating the Rust side without the Android UI.
 
 ## Architecture and data
 
 On Android, the native library starts the Rivium embedded host and uses the app-private files directory for the Apalis SQLite database and job result files. Room stores links and their displayed state. The job ID ties a Room entry to its Rust queue result. Queue entries and results survive app process restarts because they are stored in app-private persistent storage.
+
+Monitoring schedules, occurrences, and history are stored in the same Rust-owned SQLite database. Cron registrations are rebuilt from enabled schedules whenever the embedded host starts. If the app process is stopped, checks pause and startup queues one deterministic catch-up check for each overdue schedule. Monitoring supports hourly, every 6 hours, every 12 hours, daily, and weekly intervals. Deleting a saved link or monitoring schedule also deletes its monitoring history; pausing leaves in-progress checks alone but stops future checks.
+
+Monitoring uses HTTP(S) only, disables proxy environment variables, validates DNS addresses and redirects, rejects non-public IPs, and limits connection time, total check time, redirects, retries, and response handling. It does not download response bodies. URLs with query parameters are redacted in the displayed check history.
+
+The Rust worker defaults to a 5-second connection timeout, 15-second total check timeout, at most 5 redirects, and 3 HTTP attempts with exponential backoff. Laptop runs can override these with `LINKQUEUE_MONITOR_CONNECT_TIMEOUT_SECONDS`, `LINKQUEUE_MONITOR_TOTAL_TIMEOUT_SECONDS`, `LINKQUEUE_MONITOR_MAX_REDIRECTS` (capped at 5), and `LINKQUEUE_MONITOR_MAX_RETRIES` (capped at 5). Android uses the same defaults.
 
 On a laptop, the standalone Rivium process host and enqueue command use the same local data directory. Android and laptop use separate local databases; they do not share jobs over a network.
 

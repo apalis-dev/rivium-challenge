@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -43,9 +45,23 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import org.json.JSONArray
 import java.text.DateFormat
 import java.util.Date
 import java.util.UUID
+
+private fun intervalLabel(interval: String): String = when (interval) {
+    "hourly" -> "Every hour"
+    "6_hours" -> "Every 6 hours"
+    "12_hours" -> "Every 12 hours"
+    "daily" -> "Every day"
+    "weekly" -> "Every week"
+    else -> "Custom interval"
+}
+
+private fun formatTimestamp(timestamp: Long): String =
+    if (timestamp <= 0L) "Not checked yet"
+    else DateFormat.getDateTimeInstance().format(Date(timestamp * 1_000L))
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,6 +102,7 @@ private fun LinkQueueScreen(
     var status by remember { mutableStateOf("Starting Rust worker…") }
     var workerReady by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
+    var monitoringJson by remember { mutableStateOf("[]") }
 
     LaunchedEffect(dataDirectory) {
         try {
@@ -107,6 +124,7 @@ private fun LinkQueueScreen(
             status = "Could not start Rust worker: ${error.message ?: "unknown error"}"
         }
 
+        var monitoringPollCount = 0
         while (isActive && workerReady) {
             try {
                 val pending = withContext(Dispatchers.IO) { dao.findPending() }
@@ -149,7 +167,28 @@ private fun LinkQueueScreen(
             } catch (error: Exception) {
                 status = "Worker is running, but result refresh failed: ${error.message ?: "unknown error"}"
             }
+            monitoringPollCount++
+            if (monitoringPollCount % 5 == 0) {
+                try {
+                    val snapshot = withContext(Dispatchers.IO) {
+                        NativeBridge.nativeGetMonitoring(dataDirectory)
+                    }
+                    if (!snapshot.startsWith("ERROR:")) monitoringJson = snapshot
+                } catch (_: Exception) {
+                    // Monitoring data is refreshed on the next poll; queue status remains independent.
+                }
+            }
             delay(1_000)
+        }
+    }
+
+    val monitoringByLink = remember(monitoringJson) {
+        buildMap<Long, JSONObject> {
+            val entries = JSONArray(monitoringJson)
+            for (index in 0 until entries.length()) {
+                val schedule = entries.getJSONObject(index)
+                put(schedule.getLong("saved_link_id"), schedule)
+            }
         }
     }
 
@@ -256,6 +295,7 @@ private fun LinkQueueScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(links, key = { it.id }) { link ->
+                    val schedule = monitoringByLink[link.id]
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors()
@@ -284,6 +324,113 @@ private fun LinkQueueScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            HorizontalDivider()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Availability monitoring", style = MaterialTheme.typography.titleSmall)
+                            if (schedule == null) {
+                                var selectedInterval by remember(link.id) { mutableStateOf("hourly") }
+                                var intervalMenuOpen by remember(link.id) { mutableStateOf(false) }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(onClick = { intervalMenuOpen = true }) {
+                                        Text(intervalLabel(selectedInterval))
+                                    }
+                                    DropdownMenu(
+                                        expanded = intervalMenuOpen,
+                                        onDismissRequest = { intervalMenuOpen = false }
+                                    ) {
+                                        listOf("hourly", "6_hours", "12_hours", "daily", "weekly").forEach { interval ->
+                                            DropdownMenuItem(
+                                                text = { Text(intervalLabel(interval)) },
+                                                onClick = {
+                                                    selectedInterval = interval
+                                                    intervalMenuOpen = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                    Button(enabled = workerReady, onClick = {
+                                        scope.launch {
+                                            val response = withContext(Dispatchers.IO) {
+                                                NativeBridge.nativeCreateMonitor(
+                                                    link.id,
+                                                    link.normalizedUrl,
+                                                    selectedInterval,
+                                                    dataDirectory
+                                                )
+                                            }
+                                            if (response.startsWith("ERROR:")) {
+                                                status = response.removePrefix("ERROR:").trim()
+                                            } else {
+                                                status = "Monitoring enabled for this link."
+                                                monitoringJson = withContext(Dispatchers.IO) {
+                                                    NativeBridge.nativeGetMonitoring(dataDirectory)
+                                                }
+                                            }
+                                        }
+                                    }) { Text("Enable") }
+                                }
+                            } else {
+                                val scheduleId = schedule.optString("schedule_id")
+                                val enabled = schedule.optBoolean("enabled")
+                                Text("${if (enabled) "Active" else "Paused"} · ${intervalLabel(schedule.optString("interval"))}")
+                                val latest = schedule.optJSONObject("latest")
+                                if (latest != null) {
+                                    Text("Latest: ${latest.optString("classification")}${latest.optInt("http_status", 0).let { if (it > 0) " · HTTP $it" else "" }}")
+                                    latest.optLong("response_duration_ms", -1).takeIf { it >= 0 }?.let {
+                                        Text("Response time: ${it} ms")
+                                    }
+                                    latest.optString("error_category").takeIf { it.isNotBlank() && it != "null" }?.let {
+                                        Text("Check detail: ${it.replace('_', ' ')}", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    latest.optString("final_url").takeIf { it.isNotBlank() && it != "null" }?.let {
+                                        Text("Final URL: $it", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    Text("Checked: ${formatTimestamp(latest.optLong("checked_at"))}", style = MaterialTheme.typography.labelSmall)
+                                } else {
+                                    Text("No checks yet. Next check: ${formatTimestamp(schedule.optLong("next_execution_at"))}")
+                                }
+                                val history = schedule.optJSONArray("history") ?: JSONArray()
+                                if (history.length() > 1) {
+                                    Text("Recent checks", style = MaterialTheme.typography.labelLarge)
+                                    for (index in 1 until history.length()) {
+                                        val item = history.getJSONObject(index)
+                                        Text(
+                                            "${formatTimestamp(item.optLong("checked_at"))}: ${item.optString("classification")}" +
+                                                item.optInt("http_status", 0).takeIf { it > 0 }?.let { " · HTTP $it" }.orEmpty() +
+                                                item.optLong("response_duration_ms", -1).takeIf { it >= 0 }?.let { " · ${it} ms" }.orEmpty(),
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(enabled = workerReady, onClick = {
+                                        scope.launch {
+                                            val response = withContext(Dispatchers.IO) {
+                                                NativeBridge.nativeSetMonitorEnabled(scheduleId, !enabled, dataDirectory)
+                                            }
+                                            if (response.startsWith("ERROR:")) status = response.removePrefix("ERROR:").trim()
+                                            else monitoringJson = withContext(Dispatchers.IO) {
+                                                NativeBridge.nativeGetMonitoring(dataDirectory)
+                                            }
+                                        }
+                                    }) { Text(if (enabled) "Pause" else "Resume") }
+                                    Button(enabled = workerReady, onClick = {
+                                        scope.launch {
+                                            val response = withContext(Dispatchers.IO) {
+                                                NativeBridge.nativeDeleteMonitor(scheduleId, dataDirectory)
+                                            }
+                                            if (response.startsWith("ERROR:")) status = response.removePrefix("ERROR:").trim()
+                                            else {
+                                                status = "Monitoring schedule and history deleted."
+                                                monitoringJson = withContext(Dispatchers.IO) {
+                                                    NativeBridge.nativeGetMonitoring(dataDirectory)
+                                                }
+                                            }
+                                        }
+                                    }) { Text("Delete monitoring") }
+                                }
+                            }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 DateFormat.getDateTimeInstance().format(Date(link.createdAt)),
@@ -292,6 +439,13 @@ private fun LinkQueueScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             Button(onClick = {
                                 scope.launch {
+                                    val monitorDelete = withContext(Dispatchers.IO) {
+                                        NativeBridge.nativeDeleteMonitorForLink(link.id, dataDirectory)
+                                    }
+                                    if (monitorDelete.startsWith("ERROR:")) {
+                                        status = monitorDelete.removePrefix("ERROR:").trim()
+                                        return@launch
+                                    }
                                     withContext(Dispatchers.IO) { dao.deleteById(link.id) }
                                     status = "Link deleted."
                                 }

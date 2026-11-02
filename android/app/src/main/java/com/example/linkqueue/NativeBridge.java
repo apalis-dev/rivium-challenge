@@ -25,4 +25,29 @@ public final class NativeBridge {
             String dataDirectory
     );
 
+    public static native String nativeCreateMonitor(
+            long savedLinkId,
+            String url,
+            String interval,
+            String dataDirectory
+    );
+
+    public static native String nativeSetMonitorEnabled(
+            String scheduleId,
+            boolean enabled,
+            String dataDirectory
+    );
+
+    public static native String nativeDeleteMonitor(
+            String scheduleId,
+            String dataDirectory
+    );
+
+    public static native String nativeDeleteMonitorForLink(
+            long savedLinkId,
+            String dataDirectory
+    );
+
+    public static native String nativeGetMonitoring(String dataDirectory);
+
 }
