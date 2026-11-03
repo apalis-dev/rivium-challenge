@@ -1,0 +1,21 @@
+# Rust
+rust/target/
+**/*.rs.bk
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/app/src/main/jniLibs/
+android/local.properties
+android/.idea/
+*.apk
+*.aab
+
+# Runtime data (demo roots)
+demo-root/
+kill-root/
+**/files/
+
+# OS
+.DS_Store
