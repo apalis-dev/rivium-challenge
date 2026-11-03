@@ -10,13 +10,15 @@
 
 ---
 
-## Demos & Screenshots
+## Demo
 
 - **Full Workflow Demo:** Converting documents on desktop and Android, including force-stop crash resilience mid-batch.
 
-[INSERT DEMO VIDEO/GIF HERE]
+https://github.com/user-attachments/assets/666b72c5-b80b-439e-b932-2a5f6afaa917
 
-- **Terminal Output (`cargo run`):** `converted to pdf ... source=report.docx bytes=120482 ms=342`
+- **Terminal Output (`cargo run`):**
+
+<img width="761" height="183" alt="documentconvertedsuccesfully" src="https://github.com/user-attachments/assets/77fb5aa5-d30d-4e74-bf5c-42a3a31e87bf" />
 
 - **Test Device:** Running on Android 14 (Samsung Galaxy A13).
 
