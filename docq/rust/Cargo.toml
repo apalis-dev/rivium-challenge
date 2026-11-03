@@ -1,0 +1,19 @@
+[package]
+name = "docq"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+ 
+[dependencies]
+apalis = "1"
+apalis-sqlite = "1"
+office2pdf = "0.9"
+rivium = { version = "0.2", features = ["rt"] }
+rivium-host = { version = "0.2", features = ["process"] }
+rivium-jni = "0.2"
+serde = { version = "1", features = ["derive"] }
+sqlx = { version = "0.9", default-features = false, features = ["sqlite", "runtime-tokio"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "fs"] }
+tracing = "0.1"
