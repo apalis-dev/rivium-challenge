@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same crab cropped tight for the status bar (Android tints it white). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="68" android:viewportHeight="46">
+    <group android:translateX="-20" android:translateY="-35">
+    <!-- body -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M34,60 a20,13 0 1,0 40,0 a20,13 0 1,0 -40,0 z" />
+    <!-- eyes on stalks -->
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M46,48 L45,40 M62,48 L63,40" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M42,38 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 z M60,38 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 z" />
+    <!-- arms and claws -->
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3.5" android:strokeLineCap="round" android:pathData="M36,55 L27,45 M72,55 L81,45" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M20,41 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 z M76,41 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 z" />
+    <!-- legs -->
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M36,66 L28,72 M40,71 L34,79 M46,73 L42,81 M72,66 L80,72 M68,71 L74,79 M62,73 L66,81" />
+    </group>
+</vector>
